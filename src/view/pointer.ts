@@ -11,7 +11,8 @@ import { stopAnimation } from './views';
 type Ptr =
   | { mode: 'orbit' | 'pan'; x: number; y: number; moved: boolean; button: number }
   | { mode: 'handle'; drag: HandleDrag; x: number; y: number; moved: boolean; button: number }
-  | { mode: 'skdrag'; drag: SketchDrag };
+  | { mode: 'skdrag'; drag: SketchDrag }
+  | { mode: 'tooldrag'; data: unknown; x: number; y: number; moved: boolean; button: number };
 
 export function initPointer(): void {
   let ptr: Ptr | null = null;
@@ -22,6 +23,12 @@ export function initPointer(): void {
     setPointer(e);
     const drag = handleDragStart(e);
     if (drag) { ptr = { mode: 'handle', drag, x: e.clientX, y: e.clientY, moved: false, button: e.button }; canvas.style.cursor = 'grabbing'; return; }
+    // a tool's own draggable things (hole markers)
+    const A = state.active;
+    if (A && A.def.dragStart && e.button === 0) {
+      const data = A.def.dragStart(A, e);
+      if (data) { ptr = { mode: 'tooldrag', data, x: e.clientX, y: e.clientY, moved: false, button: 0 }; return; }
+    }
     // with no sketch tool active, pressing on a point, line or circle drags it
     if (state.mode === 'sketch' && !state.pick) {
       const sd = sketchDragStart(e);
@@ -37,6 +44,14 @@ export function initPointer(): void {
       return;
     }
     if (ptr.mode === 'skdrag') { sketchDragMove(e, ptr.drag); return; }
+    if (ptr.mode === 'tooldrag') {
+      if (!ptr.moved && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) < 4) return;
+      ptr.moved = true;
+      canvas.style.cursor = 'grabbing';
+      const A = state.active;
+      if (A && A.def.dragMove) A.def.dragMove(A, ptr.data, e);
+      return;
+    }
     if (ptr.mode === 'handle') {
       // a press on the arrow that does not move is a click on whatever is under it (the arrow can sit on an edge)
       if (!ptr.moved && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) < 4) return;
@@ -64,6 +79,7 @@ export function initPointer(): void {
     canvas.style.cursor = '';
     if (was.mode === 'handle' && was.moved) { focusPrimary(); return; }
     if (was.mode === 'skdrag') { sketchDragEnd(was.drag); return; }
+    if (was.mode === 'tooldrag' && was.moved) { const A = state.active; if (A && A.def.dragEnd) A.def.dragEnd(A, was.data); return; }
     if (was.moved) return;
     setPointer(e);
     // right-click (without dragging) opens the menu for whatever is under the cursor

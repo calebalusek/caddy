@@ -48,8 +48,8 @@ test.describe('app shell', () => {
     await page.keyboard.type('pl');
     await expect(page.locator('#sugs li').first()).toContainText('Offset plane');
     await page.keyboard.press('Escape');
-    await typeCommand(page, 'rev');
-    await expect(page.locator('#msg')).toContainText('Revolve arrives in step 5');
+    await typeCommand(page, 'sw');
+    await expect(page.locator('#msg')).toContainText('Sweep arrives in step 6');
     await page.locator('.tbtn[data-cmd="mirror"]').click();
     await expect(page.locator('#msg')).toContainText("Mirror isn't built yet");
     await typeCommand(page, 'top');

@@ -22,6 +22,8 @@ import { initDialogs, openDialog } from './tools/dialog';
 import './tools/plane';
 import './tools/extrude';
 import './tools/fillet';
+import './tools/revolve';
+import './tools/hole';
 import { initChrome } from './ui/chrome';
 import { initCommandBar } from './ui/cmdbar';
 import { initKeyboard } from './ui/keyboard';

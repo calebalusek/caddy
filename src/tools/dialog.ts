@@ -69,6 +69,10 @@ export interface ToolDef<P = any> {
   click?: (A: ActiveDialog<P>, e: PointerEvent) => void;
   /** Something clicked in the Browser or History while the menu is open (standing rule 2). Return true if it was used. */
   pickRef?: (A: ActiveDialog<P>, kind: string, id: string) => boolean;
+  /** Pressing on something of the tool's own in the viewport (a hole marker) starts a drag; return its data, or null. */
+  dragStart?: (A: ActiveDialog<P>, e: PointerEvent) => any;
+  dragMove?: (A: ActiveDialog<P>, data: any, e: PointerEvent) => void;
+  dragEnd?: (A: ActiveDialog<P>, data: any) => void;
   /** The bodies were rebuilt while the menu is open. */
   onBuilt?: (A: ActiveDialog<P>) => void;
   /** The menu is closing: remove the tool's highlights. */
