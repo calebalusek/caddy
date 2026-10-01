@@ -45,7 +45,8 @@ export function lookAtSketch(sk?: SketchFeature | null): void {
   if (!sk || !sk.frame) return;
   const fr = sk.frame, a = frameAngles(v3(fr.n));
   let pts = sketchWorldPoints(sk);
-  if (!pts.length) { const e = fr.ext; pts = ([[e[0], e[2]], [e[1], e[3]]] as const).map(([x, y]) => tw(fr, x, y)); }
+  if (!pts.length) { // an empty sketch opens with room to draw (the plane itself is drawn small)
+    const e = fr.ext, w = Math.max(60, e[1] - e[0]), h = Math.max(60, e[3] - e[2]); pts = ([[e[0], e[2]], [e[0] + w, e[2] + h]] as const).map(([x, y]) => tw(fr, x, y)); }
   animateTo({ theta: a.theta, phi: a.phi, ...fitView(pts, a.theta, a.phi, 1.25) });
 }
 

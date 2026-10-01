@@ -15,7 +15,7 @@ import { initLibrary } from './ui/library';
 import { regenerate } from './app/regenerate';
 import { feats, state } from './app/state';
 import { $ } from './core/dom';
-import { baseBodies, isBuilding, kernel, shownBodies, whenBuilt } from './app/solids';
+import { baseBodies, isBuilding, kernel, previewBodies, whenBuilt } from './app/solids';
 import { bodyFitPoints } from './view/bodies';
 import { toWorld } from './model/frames';
 import { initDialogs, openDialog } from './tools/dialog';
@@ -102,4 +102,4 @@ function sketchScreen(x: number, y: number): { x: number; y: number } | null {
   const sk = state.sketch;
   return sk && sk.frame ? screenOf(toWorld(sk.frame, x, y)) : null;
 }
-window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies, baseBodies, projectFile, importFile, flushSave };
+window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies: previewBodies, baseBodies, projectFile, importFile, flushSave };

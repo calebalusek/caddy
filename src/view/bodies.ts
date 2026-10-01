@@ -4,9 +4,9 @@ import * as THREE from 'three';
 import { cssv } from '../core/dom';
 import { on } from '../app/hub';
 import { state } from '../app/state';
-import type { BodyResult, EdgeInfo, FaceInfo } from '../kernel/protocol';
+import type { BodyMesh, BodyResult, EdgeInfo, FaceInfo } from '../kernel/protocol';
 import type { Vec3 } from '../model/types';
-import { bodyMat, camera, cam, edgeMat, onFrame, scene, V3, vp } from './scene';
+import { bodyMat, camera, cam, edgeMat, hideInThumbnails, onFrame, scene, V3, vp } from './scene';
 
 const ghostMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.22, depthWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const ghostEdgeMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false });
@@ -146,6 +146,39 @@ export function insideBase(pt: V3, bodies: BodyResult[]): boolean {
     testRay.intersectObject(m, false).forEach((h) => { if (h.distance - last > 1e-5) { n++; last = h.distance; } });
     return n % 2 === 1;
   });
+}
+
+// ---- live preview of a tool on the body: what it removes (red) and what it adds (blue) ----
+const removedMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.4, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
+const removedEdgeMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.9, depthTest: false });
+const addedMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+const addedEdgeMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.9 });
+const diffGroup = new THREE.Group();
+diffGroup.renderOrder = 8;
+scene.add(diffGroup);
+hideInThumbnails(diffGroup);
+function diffColors(): void {
+  const cut = cssv('--cut'), add = cssv('--accent-fill');
+  removedMat.color.set(cut); removedEdgeMat.color.set(cut); addedMat.color.set(add); addedEdgeMat.color.set(add);
+}
+on('theme', diffColors);
+export function setDiffPreview(removed: BodyMesh[], added: BodyMesh[]): void {
+  while (diffGroup.children.length) { const c = diffGroup.children[0] as THREE.Mesh; diffGroup.remove(c); c.geometry.dispose(); }
+  diffColors();
+  const add = (m: BodyMesh, mat: THREE.Material, lineMat: THREE.Material): void => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(m.positions, 3));
+    g.setIndex(new THREE.BufferAttribute(m.indices, 1));
+    const mesh = new THREE.Mesh(g, mat);
+    mesh.renderOrder = 8;
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.BufferAttribute(m.edgeLines, 3));
+    const lines = new THREE.LineSegments(lg, lineMat);
+    lines.renderOrder = 9;
+    diffGroup.add(mesh, lines);
+  };
+  removed.forEach((m) => add(m, removedMat, removedEdgeMat));
+  added.forEach((m) => add(m, addedMat, addedEdgeMat));
 }
 
 // ---- highlights ----

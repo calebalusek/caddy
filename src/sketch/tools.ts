@@ -316,22 +316,9 @@ function addCon(sk: SketchFeature, con: NewCon, silent: boolean): boolean {
   return true;
 }
 
-// A point placed on a snap stays attached to what it snapped to.
-let pendingSnaps: [string, Snap][] = [];
-function attachSnap(pid: string, sn: Snap | null | undefined): void { if (sn && pid) pendingSnaps.push([pid, sn]); }
-function flushSnaps(sk: SketchFeature): void { const list = pendingSnaps; pendingSnaps = []; list.forEach(([pid, sn]) => applySnap(sk, pid, sn)); }
-function applySnap(sk: SketchFeature, pid: string, sn: Snap): void {
-  if (!sn || !pid) return;
-  const onCurve = (cvId?: string): void => {
-    const cv = cvId ? curveOf(sk, cvId) : undefined;
-    if (!cv || curvePtIds(cv).includes(pid)) return;
-    addCon(sk, cv.type === 'line' ? { type: 'ponl', p: pid, l: cv.id } : { type: 'ponc', p: pid, c: cv.id }, true);
-  };
-  if (sn.kind === 'mid') { const cv = sn.cv ? curveOf(sk, sn.cv) : undefined; if (cv && cv.type === 'line') addCon(sk, { type: 'midpt', p: pid, l: cv.id }, true); else onCurve(sn.cv); }
-  else if (sn.kind === 'near' || sn.kind === 'quad') onCurve(sn.cv);
-  else if (sn.kind === 'int') { onCurve(sn.cv); onCurve(sn.cv2); }
-  else if ((sn.kind === 'track' || sn.kind === 'track2') && sn.aligns) sn.aligns.forEach((a) => { if (a.ref && !(a.ref.kind === 'pt' && a.ref.id === pid)) addCon(sk, { type: 'align', p: pid, axis: a.axis, ref: Object.assign({}, a.ref) }, true); });
-}
+// Snapping only places the point exactly; it never adds constraints. The user adds those if they want them.
+function attachSnap(_pid: string, _sn: Snap | null | undefined): void { /* no automatic constraints */ }
+function flushSnaps(_sk: SketchFeature): void { /* no automatic constraints */ }
 /** Dimension offset that puts a new length dimension on the outside of a shape. */
 function offAway(sk: SketchFeature, lineId: string, center: P2): number {
   const l = curveOf(sk, lineId) as LineCurve, a = PT(sk, l.p1), b = PT(sk, l.p2);
@@ -341,7 +328,6 @@ function offAway(sk: SketchFeature, lineId: string, center: P2): number {
 }
 
 export function commitShape(): void {
-  pendingSnaps = [];
   const T = state.tool, sk = state.sketch;
   if (!T || !T.pts.length || !sk) return;
   const s = toolShape(), snap = snapshot(sk), typed = (k: string): boolean => hudVal(k) !== null, cur = T.cur || T.pts[0];
@@ -399,7 +385,6 @@ export function commitShape(): void {
     const P2_ = !typed('l') && cur.id && cur.id !== P1 ? cur.id : addPt(sk, s.b[0], s.b[1]);
     if (!typed('l') && !cur.id) attachSnap(P2_, cur.snap);
     const l = addLine(sk, P1, P2_);
-    if (T.inf === 'h') addCon(sk, { type: 'horizontal', l }, true); else if (T.inf === 'v') addCon(sk, { type: 'vertical', l }, true);
     if (typed('l')) addCon(sk, { type: 'length', l, v: s.l, off: 26 * skScale(sk) }, true);
     if (!T.start.id) T.start.id = P1;
     closed = P2_ === T.start.id;

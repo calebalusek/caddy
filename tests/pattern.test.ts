@@ -110,3 +110,11 @@ describe('pattern errors', () => {
     expect(note(pat({ layout: 'Fit to edges', cols: 2, rows: 2 }))).toMatch(/Click an edge/);
   });
 });
+
+describe('a pattern that cannot be placed leaves the original alone', () => {
+  it('Fit to edges before the edges are picked: the hole stays where it was drawn', () => {
+    const r = buildModel([plate(), hole(10, 10, 4), pat({ layout: 'Fit to edges', cols: 3, rows: 2 })]);
+    expect(r.steps[2].note).toMatch(/Click an edge/);
+    expect(r.bodies[0].volume).toBeCloseTo(V(60, 40, 8) - holeV(4), 5);
+  });
+});

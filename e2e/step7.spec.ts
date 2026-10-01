@@ -153,3 +153,78 @@ test.describe('pattern', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('owner feedback round 1', () => {
+  test('hole snaps to face critical points; Shift-click two points puts the hole halfway', async ({ page }) => {
+    const errors = await openApp(page);
+    await box(page, 60, 40, 8);
+    await typeCommand(page, 'ho');
+    const aim = async (q: [number, number, number], dx = 5, dy = 4): Promise<{ x: number; y: number }> => { const s = await screenOf(page, q); await page.mouse.move(s.x + dx + 30, s.y + dy); await page.mouse.move(s.x + dx, s.y + dy); return { x: s.x + dx, y: s.y + dy }; };
+    // near the middle of the top face: the hole lands exactly in the middle (the middle of the two long sides)
+    let p = await aim([30, 20, 8]);
+    await page.mouse.click(p.x, p.y);
+    // near a corner and an edge middle
+    p = await aim([60, 0, 8], -4, 3); await page.mouse.click(p.x, p.y);
+    p = await aim([30, 40, 8], 3, 5); await page.mouse.click(p.x, p.y);
+    // Shift-click the middle of the left edge and the middle of the front edge: the hole goes halfway between them
+    await page.keyboard.down('Shift');
+    p = await aim([0, 20, 8], 3, 3); await page.mouse.click(p.x, p.y);
+    await page.waitForTimeout(500); p = await aim([30, 0, 8], 2, -4); await page.mouse.click(p.x, p.y);
+    await page.keyboard.up('Shift');
+    await page.keyboard.type('4'); await page.keyboard.press('Enter');
+    const pts: number[][] = await page.evaluate(() => (window as any).__caddy.state.features.find((f: any) => f.type === 'hole').params.pts.map((r: any) => r.p));
+    const near = (a: number[], b: number[]): boolean => a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
+    expect(pts).toHaveLength(4);
+    expect(near(pts[0], [30, 20, 8])).toBe(true); // middle of the face
+    expect(near(pts[1], [60, 0, 8])).toBe(true); // corner
+    expect(near(pts[2], [30, 40, 8])).toBe(true); // edge middle
+    expect(near(pts[3], [15, 10, 8])).toBe(true); // halfway between two critical points
+    expect(errors).toEqual([]);
+  });
+
+  test('Fit to edges: choosing it goes straight to picking the two edges; the hole stays until they are set; rows and columns fill in equal spacing', async ({ page }) => {
+    const errors = await openApp(page);
+    await plateWithHole(page);
+    await typeCommand(page, 'ptr');
+    await page.locator('#timeline [data-ref="hole:h1"]').click();
+    await page.locator('input[name="f-layout"][value="Fit to edges"]').check({ force: true });
+    await expect(page.locator('#e1Chip')).toHaveClass(/picking/); // the next click is the length edge
+    let s = await built(page);
+    expect(s.bodies[0].volume).toBeCloseTo(PLATE - HOLE, 4); // nothing disappears while the edges are not picked
+    const e1 = await screenOf(page, [40, 0, 8]), e2 = await screenOf(page, [0, 25, 8]);
+    await page.mouse.move(e1.x + 30, e1.y + 30); await page.mouse.move(e1.x, e1.y); await page.mouse.move(e1.x + 0.5, e1.y);
+    await page.mouse.click(e1.x + 0.5, e1.y);
+    await expect(page.locator('#e1Chip')).toHaveText('Edge of 60 mm');
+    await expect(page.locator('#e2Chip')).toHaveClass(/picking/);
+    await page.mouse.move(e2.x + 30, e2.y + 30); await page.mouse.move(e2.x, e2.y); await page.mouse.move(e2.x, e2.y + 0.5);
+    await page.mouse.click(e2.x, e2.y + 0.5);
+    await expect(page.locator('#e2Chip')).toHaveText('Edge of 40 mm');
+    await page.locator('#f-cols').fill('3');
+    await page.locator('#f-rows').fill('2');
+    s = await built(page);
+    expect(s.bodies[0].volume).toBeCloseTo(PLATE - 6 * HOLE, 4); // six holes; the original moved into the grid
+    await page.locator('#okBtn').click();
+    s = await built(page);
+    expect(s.features.every((f: any) => !f.error)).toBe(true);
+    expect(s.bodies[0].volume).toBeCloseTo(PLATE - 6 * HOLE, 4);
+    expect(errors).toEqual([]);
+  });
+
+  test('tool previews keep the original body and show what changes; the arrow moves smoothly', async ({ page }) => {
+    const errors = await openApp(page);
+    await box(page, 40, 30, 20);
+    const top = await screenOf(page, [20, 15, 20]);
+    await page.mouse.move(top.x, top.y); await page.mouse.click(top.x, top.y);
+    await typeCommand(page, 'sh');
+    await page.keyboard.type('2');
+    await built(page);
+    const v = await page.evaluate(() => { const c = (window as any).__caddy; return { shown: c.baseBodies()[0].volume, preview: c.shownBodies()[0].volume }; });
+    expect(v.shown).toBeCloseTo(24000, 6); // the original is still what is drawn
+    expect(v.preview).toBeCloseTo(7152, 4); // what OK would make
+    // dragging the arrow: tenths of a millimeter, not whole millimeters
+    const tip = await page.evaluate(() => { const c = (window as any).__caddy; return c.state.active.params.thickness; });
+    expect(tip).toBe(2);
+    await page.keyboard.press('Escape');
+    expect(errors).toEqual([]);
+  });
+});

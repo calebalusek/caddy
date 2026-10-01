@@ -151,12 +151,17 @@ export interface BodyResult {
 export interface StepResult { id: string; error?: boolean; note?: string; box?: [Vec3, Vec3] }
 export interface BuildResult { bodies: BodyResult[]; steps: StepResult[] }
 
+/** A tool's live preview: the model as it is, the model with the tool applied, and what the tool takes away and adds. */
+export interface DraftResult { base: BuildResult; draft: BuildResult; removed: BodyMesh[]; added: BodyMesh[] }
+
 export interface KernelOps {
   ping: { args: []; result: 'ready' };
   /** A w × d × h box with a corner at the origin (self-test). */
   testBox: { args: [w: number, d: number, h: number]; result: BodyMesh };
   /** Rebuild every body from the timeline. */
   build: { args: [steps: BuildStep[]]; result: BuildResult };
+  /** The same, with one more step applied on top: for tools that preview on the real body. */
+  buildDraft: { args: [steps: BuildStep[], draft: BuildStep]; result: DraftResult };
   /** Triangles for STL / 3MF at a chosen fineness. ids = which bodies (null = all). */
   exportMesh: { args: [steps: BuildStep[], quality: { tolerance: number; angularTolerance: number }, ids: string[] | null]; result: { id: string; positions: Float32Array; indices: Uint32Array; volume: number }[] };
   /** A STEP file of the listed bodies. */

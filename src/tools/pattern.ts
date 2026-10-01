@@ -18,7 +18,7 @@ import { v3 } from '../view/planes';
 import { focusPrimary, refreshHandle, registerTool, setHint, updateChips, updatePreview, openDialog, syncFields, type ActiveDialog } from './dialog';
 import { mouse } from './pick';
 
-type Dlg = ActiveDialog<PatternParams> & { pickMode?: 'copy' | 'e1' | 'e2' | 'v1' | 'v2' | 'axis' };
+type Dlg = ActiveDialog<PatternParams> & { lastKey?: string; pickMode?: 'copy' | 'e1' | 'e2' | 'v1' | 'v2' | 'axis' };
 const PATTERNABLE = new Set(['extrude', 'hole', 'revolve', 'sweep']);
 let preset: PatternParams['ptype'] = 'Rectangular';
 /** Open the menu as the rectangular or the circular pattern (PTR / PTC). */
@@ -164,6 +164,17 @@ registerTool<PatternParams>({
   },
   preview: (A: Dlg) => {
     const P = A.params;
+    // choosing Fit to edges / Edge direction / Pick axis goes straight to picking what it needs
+    const key = [P.ptype, P.layout, P.dir1, P.dir2, P.axis].join('|');
+    if (key !== A.lastKey) {
+      A.lastKey = key;
+      if (fit(P)) A.pickMode = !P.e1 ? 'e1' : !P.e2 ? 'e2' : 'copy';
+      else if (spacing(P) && P.dir1 === 'Edge' && !P.v1) A.pickMode = 'v1';
+      else if (spacing(P) && P.dir2 === 'Edge' && !P.v2) A.pickMode = 'v2';
+      else if (!isRect(P) && P.axis === 'Pick' && !P.axD) A.pickMode = 'axis';
+      else A.pickMode = 'copy';
+      queueMicrotask(updateChips);
+    }
     drawPicked(A);
     setHint('h-d1', spacing(P) && !(+P.d1) ? ZERO : '');
     let handle = null;
@@ -172,7 +183,8 @@ registerTool<PatternParams>({
       const d = AX[P.dir1], v = Math.max(0, +P.d1 || 0);
       handle = { base: v3(c), tip: v3(vadd(c, vsc(d, v))), axis: v3(d), dir: 1, value: P.d1 || 0 };
     }
-    return { handle, ok: (P.what === 'Bodies' ? P.bodies.length : P.feats.length) > 0 };
+    const src = P.what === 'Features' ? featById(P.feats[0] || '') : null, cut = !!src && (src.type === 'hole' || (src.params as any).operation === 'Cut');
+    return { handle, cut, ok: (P.what === 'Bodies' ? P.bodies.length : P.feats.length) > 0 };
   },
   onBuilt: (A: Dlg) => {
     drawPicked(A);

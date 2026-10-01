@@ -147,7 +147,7 @@ registerTool<SweepParams>({
     drawPath(P);
     if (P.opAuto && !A.edit) { P.operation = autoOperation(P).op; setChoice('operation', P.operation); }
     setHint('opHint', P.opAuto ? 'Picked automatically' : '');
-    return { ok: (!!r || !!P.face) && !!pathOf(P).path };
+    return { cut: P.operation === 'Cut', ok: (!!r || !!P.face) && !!pathOf(P).path };
   },
   onBuilt: (A: Dlg) => {
     drawPath(A.params);

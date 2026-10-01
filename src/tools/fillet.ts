@@ -85,7 +85,7 @@ function make(kind: 'fillet' | 'chamfer'): ToolDef<FilletParams> {
     defaults: () => ({ kind, edges: selectedEdgeRefs(), r: 0 }),
     chips: (A) => { const n = A.params.edges.length; return { edgeChip: { set: n > 0, text: n ? `${n} edge${n > 1 ? 's' : ''} selected` : 'Click the edges to ' + (kind === 'chamfer' ? 'bevel' : 'round') } }; },
     draftStep: (A) => (A.params.edges.length && A.params.r > 0 ? { kind: 'fillet', id: A.edit ? A.edit.id : 'draft', mode: kind, r: A.params.r, edges: A.params.edges } : null),
-    preview: (A: Dlg) => { drawPicked(A); return { handle: sizeHandle(A), ok: A.params.edges.length > 0 && A.params.r > 0 }; },
+    preview: (A: Dlg) => { drawPicked(A); return { handle: sizeHandle(A), cut: true, ok: A.params.edges.length > 0 && A.params.r > 0 }; },
     onBuilt: (A: Dlg) => {
       drawPicked(A);
       refreshHandle();

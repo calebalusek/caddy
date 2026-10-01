@@ -79,7 +79,7 @@ test.describe('offset plane (first tool on the shared tool-menu system)', () => 
     await expect(page.locator('#okBtn')).toBeDisabled();
 
     // Hover the XZ plane: it turns a stronger orange than the plane next to it.
-    const xz = await screenOf(page, [45, 0, 50]);
+    const xz = await screenOf(page, [22, 0, 25]);
     await page.mouse.move(xz.x - 300, xz.y - 200);
     const before = await pixelAt(page, xz.x, xz.y);
     await page.mouse.move(xz.x, xz.y);
@@ -159,11 +159,11 @@ test.describe('offset plane (first tool on the shared tool-menu system)', () => 
     expect((await state(page)).features).toHaveLength(0);
   });
 
-  test('drag arrow changes the offset in whole millimeters', async ({ page }) => {
+  test('drag arrow changes the offset smoothly, in 0.1 mm steps', async ({ page }) => {
     await openApp(page);
     await typeCommand(page, 'pl');
     await page.locator('#tree [data-ref="origin:XY"]').click();
-    const tip = await screenOf(page, [30, 30, 4]);
+    const tip = await screenOf(page, [15, 15, 4]);
     await page.mouse.move(tip.x, tip.y);
     await page.mouse.down();
     await page.mouse.move(tip.x, tip.y - 40, { steps: 5 });
@@ -171,14 +171,14 @@ test.describe('offset plane (first tool on the shared tool-menu system)', () => 
     await page.mouse.up();
     const v = Number(await page.locator('#f-distance').inputValue());
     expect(v).toBeGreaterThan(5);
-    expect(Number.isInteger(v)).toBe(true);
+    expect(Math.round(v * 10) / 10).toBe(v);
     await expect(page.locator('#dim')).toHaveText(`${v} mm`);
   });
 
   test('selected plane is bold blue; select first, then tool; new project leaves no ghosts', async ({ page }) => {
     await openApp(page);
     await typeCommand(page, 'ori');
-    const xz = await screenOf(page, [45, 0, 50]);
+    const xz = await screenOf(page, [22, 0, 25]);
     await page.mouse.click(xz.x, xz.y);
     await page.mouse.move(xz.x - 300, xz.y - 200);
     expect((await state(page)).selection).toEqual(['origin:XZ']);
@@ -206,7 +206,7 @@ test.describe('offset plane (first tool on the shared tool-menu system)', () => 
     await expect(page.locator('#timeline .tl-item')).toHaveCount(0);
     await expect(page.locator('#dim')).toBeHidden();
     await settle(page);
-    const again = await screenOf(page, [45, 0, 50]);
+    const again = await screenOf(page, [22, 0, 25]);
     expect(blueish(await pixelAt(page, again.x, again.y))).toBe(false);
   });
 });

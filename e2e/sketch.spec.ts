@@ -132,7 +132,7 @@ test.describe('sketching', () => {
     expect((await sketch(page))!.cons.find((c: any) => c.type === 'length' && c.v === 71)).toBeTruthy();
   });
 
-  test('line tool: chained lines, horizontal/vertical inference, closing the shape, undo', async ({ page }) => {
+  test('line tool: chained lines, snapping without adding constraints, closing the shape, undo', async ({ page }) => {
     await openApp(page);
     await startSketch(page);
     await typeCommand(page, 'l');
@@ -143,7 +143,7 @@ test.describe('sketching', () => {
     await expect(page.locator('#msg')).toHaveText('Closed shape. The line tool is still active.');
     let s = (await sketch(page))!;
     expect(s.curves).toHaveLength(3);
-    expect(s.cons.map((c: any) => c.type).sort()).toEqual(['horizontal', 'vertical']);
+    expect(s.cons).toEqual([]); // snapping never adds constraints; the user adds them if they want them
     expect(s.profiles).toHaveLength(1);
     expect(s.profiles[0].area).toBeCloseTo((40 * 30) / 2, 6);
     await page.keyboard.press('Escape');
@@ -196,6 +196,9 @@ test.describe('sketching', () => {
     await click(page, 0, 0);
     await click(page, 40, 0);
     await click(page, 52, 27);
+    await page.keyboard.press('Escape');
+    await typeCommand(page, 'hv'); // nothing was constrained automatically: level the first line by hand
+    await click(page, 20, 0);
     await page.keyboard.press('Escape');
     await typeCommand(page, 'pe');
     await click(page, 20, 0);
@@ -293,7 +296,7 @@ test.describe('sketching', () => {
     await expect(page.locator('#msg')).toContainText('Moved');
   });
 
-  test('object snap tracking: hovering a midpoint acquires it and adds an alignment constraint', async ({ page }) => {
+  test('object snap tracking: hovering a midpoint acquires it and snaps to where the guides cross, without adding constraints', async ({ page }) => {
     await openApp(page);
     await startSketch(page);
     await rect(page, 0, 0, 60, 40);
@@ -312,8 +315,8 @@ test.describe('sketching', () => {
     await page.keyboard.press('Enter');
     const s = (await sketch(page))!;
     expect(s.curves.find((c: any) => c.type === 'circle')!.c).toEqual([30, 20]);
-    expect(s.cons.filter((c: any) => c.type === 'align')).toHaveLength(2);
-    expect(s.dof).toBe(0); // centered by the alignments, sized by the diameter
+    expect(s.cons.filter((c: any) => c.type === 'align')).toHaveLength(0);
+    expect(s.dof).toBe(2); // only sized by the diameter; the center is free until the user constrains it
   });
 
   test('outside sketch editing a sketch is one object: orange hover, blue when selected, double-click edits', async ({ page }) => {

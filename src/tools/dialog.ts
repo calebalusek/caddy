@@ -136,9 +136,9 @@ export function handleDragStart(e: PointerEvent): HandleDrag | null {
 export function handleDragMove(e: PointerEvent, d: HandleDrag, camR: number): void {
   const t = axisParam();
   const v = t === null || d.t0 === null ? d.v0 + (d.y0 - e.clientY) * camR * 0.0025 : d.v0 + (t - d.t0);
-  // whole millimeters by default; Shift = 0.1, Alt = 0.01
-  const step = e.shiftKey ? 0.1 : e.altKey ? 0.01 : 1;
-  setDistance(Math.round(v / step) * step);
+  // smooth: 0.1 mm by default; Shift = whole millimeters, Alt = 0.01
+  const step = e.shiftKey ? 1 : e.altKey ? 0.01 : 0.1;
+  setDistance(+(Math.round(v / step) * step).toFixed(2));
 }
 export const overHandle = (): boolean => arrow.visible && ray.intersectObject(arrow.getObjectByName('grab')!, false).length > 0;
 

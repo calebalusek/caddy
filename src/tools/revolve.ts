@@ -149,7 +149,7 @@ registerTool<RevolveParams>({
     drawAxis(A);
     if (P.opAuto && !A.edit) { P.operation = autoOperation(A); setChoice('operation', P.operation); } else autoOperation(A);
     setHint('opHint', P.opAuto ? 'Picked automatically' : '');
-    return { ok: !!r && !!ax };
+    return { cut: P.operation === 'Cut', ok: !!r && !!ax };
   },
   onBuilt: (A: Dlg) => {
     drawAxis(A);

@@ -75,7 +75,7 @@ registerTool<ShellParams>({
   draftStep: (A: Dlg) => (A.params.bodyId && A.params.thickness > 0
     ? { kind: 'shell', id: A.edit ? A.edit.id : 'draft', bodyId: A.params.bodyId, faces: A.params.faces.map((f) => ({ ...f, bodyId: A.params.bodyId! })), thickness: A.params.thickness, direction: A.params.direction }
     : null),
-  preview: (A: Dlg) => { drawPicked(A); return { handle: sizeHandle(A), ok: !!A.params.bodyId && A.params.thickness > 0 }; },
+  preview: (A: Dlg) => { drawPicked(A); return { handle: sizeHandle(A), cut: A.params.direction !== 'Outside', ok: !!A.params.bodyId && A.params.thickness > 0 }; },
   onBuilt: (A: Dlg) => {
     drawPicked(A);
     refreshHandle();

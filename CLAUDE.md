@@ -131,6 +131,14 @@ parts for **3D printing**. Built for the owner and other people to use.
     last few steps are remembered, for the current session only (`src/app/undo.ts`).
 11. **Tools with a size get a drag arrow** in the viewport with a live value label, like Extrude
     (Fillet/Chamfer: the arrow slides across the face to show how far the cut goes in).
+12. **Previews look like Extrude's**: the original body stays drawn as it is, the material a tool
+    removes shows translucent red, what it adds shows blue (`setDiffPreview`, kernel `buildDraft`).
+    Drag arrows are smooth: 0.1 mm steps (Shift = whole mm, Alt = 0.01).
+13. **Sketching never adds constraints by itself.** Snapping only places points exactly; the user adds
+    constraints (the rectangle tool's own horizontal/vertical and typed dimensions are the exception).
+    Origin planes are drawn small (30 mm); an empty sketch still opens with room to draw.
+14. **Holes snap to a face's critical points** (corners, edge middles, the face middle, circle
+    centers); Shift-click two of them to put the hole halfway between.
 9. **Safety with printers**: no G-code / slicer features yet (parked). If ever built, use proven
    engines, conservative per-printer profiles and a mandatory preview.
 

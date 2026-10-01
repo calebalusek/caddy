@@ -9,7 +9,7 @@ import type { Frame, Vec3 } from '../model/types';
 import type { P2 } from '../sketch/model';
 import { arcDelta } from '../sketch/profiles';
 import { matchEdge } from './match';
-import type { BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, FaceSpec, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
+import type { DraftResult, BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, FaceSpec, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
 import { patternRelocates, patternTransforms, type Xf } from '../model/pattern';
 import { Scope, tup } from './scope';
 import { thickSolid } from './shell';
@@ -215,6 +215,7 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
   const suppressed = new Set<string>();
   steps.forEach((s) => { if (s.kind === 'pattern' && s.params.what === 'Features' && patternRelocates(s.params)) s.params.feats.forEach((id) => suppressed.add(id)); });
   let cur = '';
+  let restoring = false;
   const keep = <T extends Shape3D>(s: T): T => sc.add(s);
   /** Join the tool to a body, cut it from every body it touches, or make it a new body. Returns what went wrong, if anything. */
   /** Join or cut. A body with sweep sections keeps their boundary lines; everything else merges as usual. */
@@ -224,7 +225,7 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
     const fresh = (): string => tag;
     if (!toolCache.has(cur)) toolCache.set(cur, []);
     toolCache.get(cur)!.push({ op, bodyId, tool, toolTags });
-    if (suppressed.has(cur)) return null;
+    if (suppressed.has(cur) && !restoring) return null;
     if (op === 'Cut') {
       const targets = bodies.filter((b) => b.shape && boxesTouch(boxOf(b.shape), tbox));
       if (!targets.length) return 'nothing to cut';
@@ -378,6 +379,12 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
         if (!res.error && missed) fail(missed + (missed > 1 ? ' copies missed' : ' copy missed') + ' the body');
         if (!res.error && short) fail('its new bodies are not set up yet');
         if (!res.error && !made) fail('set a count of 2 or more');
+        // nothing could be placed: the original feature stays where it was drawn
+        if (res.error && !made && P.what === 'Features') {
+          restoring = true;
+          P.feats.forEach((id) => (toolCache.get(id) || []).slice().forEach((rec) => combine(rec.op, rec.bodyId, rec.tool, rec.toolTags, boxOf(rec.tool), id + ':x')));
+          restoring = false;
+        }
       } else if (st.kind === 'shell') {
         const b = st.bodyId ? bodies.find((x) => x.id === st.bodyId) : null;
         if (!b || !b.shape) { res.error = true; res.note = 'its body is gone'; continue; }
@@ -478,6 +485,25 @@ export function buildModel(steps: BuildStep[]): BuildResult {
   try {
     const { bodies, results } = runSteps(steps, sc);
     return { bodies: bodies.map((b) => bodyResult(b, sc)), steps: results };
+  } finally {
+    sc.end();
+  }
+}
+
+/** The model, and the model with one more step on top, plus the volumes that step removes and adds. */
+export function buildDraft(steps: BuildStep[], draft: BuildStep): DraftResult {
+  const sc = new Scope();
+  try {
+    const A = runSteps(steps, sc), B = runSteps(steps.concat([draft]), sc);
+    const removed: BodyMesh[] = [], added: BodyMesh[] = [];
+    const diff = (x: Shape3D, y: Shape3D, into: BodyMesh[]): void => {
+      try { const r = x.cut(y); sc.add(r); if (measureVolume(r) > 1e-6) into.push(meshBody(r)); } catch { /* nothing to show */ }
+    };
+    if (!B.results[B.results.length - 1].error) {
+      A.bodies.forEach((a) => { const b = B.bodies.find((x) => x.id === a.id); if (b) { diff(a.shape!, b.shape!, removed); diff(b.shape!, a.shape!, added); } else removed.push(meshBody(a.shape!)); });
+      B.bodies.forEach((b) => { if (!A.bodies.some((a) => a.id === b.id)) added.push(meshBody(b.shape!)); });
+    }
+    return { base: { bodies: A.bodies.map((b) => bodyResult(b, sc)), steps: A.results }, draft: { bodies: B.bodies.map((b) => bodyResult(b, sc)), steps: B.results }, removed, added };
   } finally {
     sc.end();
   }

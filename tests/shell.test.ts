@@ -55,3 +55,22 @@ describe('shell', () => {
     expect(buildModel([box(20, 20, 20), shell([top(10, 10, 20)], 25)]).bodies[0].volume).toBeCloseTo(8000, 6); // body left whole
   });
 });
+
+describe('live preview differences', () => {
+  it('a shell preview reports exactly the material it removes (the cavity), and nothing added', async () => {
+    const { buildDraft } = await import('../src/kernel/model');
+    const r = buildDraft([box(40, 30, 20)], shell([top(20, 15, 20)], 2));
+    expect(r.base.bodies[0].volume).toBeCloseTo(24000, 6);
+    expect(r.draft.bodies[0].volume).toBeCloseTo(7152, 5);
+    expect(r.removed.reduce((s, m) => s + m.volume, 0)).toBeCloseTo(36 * 26 * 18, 5);
+    expect(r.added).toHaveLength(0);
+  });
+  it('a new body preview is all "added"; a failed preview shows nothing', async () => {
+    const { buildDraft } = await import('../src/kernel/model');
+    const r = buildDraft([], box(10, 10, 10));
+    expect(r.added.reduce((s, m) => s + m.volume, 0)).toBeCloseTo(1000, 6);
+    const bad = buildDraft([box(20, 20, 20)], shell([top(10, 10, 20)], 25));
+    expect(bad.removed).toHaveLength(0);
+    expect(bad.added).toHaveLength(0);
+  });
+});

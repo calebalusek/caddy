@@ -1,6 +1,6 @@
 // Kernel entry points shared by the Web Worker (app) and Node (tests).
 import { makeBaseBox, setOC } from 'replicad';
-import { buildModel, exportMeshes, exportStep, meshBody } from './model';
+import { buildDraft, buildModel, exportMeshes, exportStep, meshBody } from './model';
 import type { BodyMesh } from './protocol';
 
 let ready = false;
@@ -24,4 +24,4 @@ export function testBox(w: number, d: number, h: number): BodyMesh {
   }
 }
 
-export { buildModel, exportMeshes, exportStep };
+export { buildDraft, buildModel, exportMeshes, exportStep };
