@@ -381,6 +381,7 @@ export function initDialogs(): void {
     A.params[t.dataset.key!] = t.value;
     if (t.dataset.key === 'operation') A.params.opAuto = false;
     applyShowIf(); updateChips(); updatePreview();
+    placePanel(dialogEl); // fields appeared or went away: keep the whole menu on screen
   });
   dialogEl.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); escapeDialog(); return; }

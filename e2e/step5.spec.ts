@@ -204,3 +204,58 @@ test.describe('hole', () => {
     expect(60 * 40 * 8 - r.bodies[0].volume).toBeCloseTo(2 * Math.PI * 6.25 * 8, 5);
   });
 });
+
+test.describe('sketch on a face', () => {
+  test('SK then click a face: the body stays solid, the view squares to the face, and it snaps to corners, midpoints and hole centers', async ({ page }) => {
+    const errors = await openApp(page);
+    await plate(page);
+    await typeCommand(page, 'ho');
+    let s = await screenOf(page, [20, 20, 8]);
+    await page.mouse.move(s.x, s.y); await page.mouse.click(s.x, s.y);
+    await page.keyboard.type('8'); await page.keyboard.press('Enter');
+    await built(page);
+
+    const body = await screenOf(page, [45, 12, 8]);
+    await page.mouse.move(body.x + 300, body.y - 200);
+    await typeCommand(page, 'sk');
+    // the hole's wall is curved: the tip says why it cannot be picked
+    s = await screenOf(page, [17.17, 22.83, 7]); // the far wall of the hole, seen through its opening
+    await page.mouse.move(s.x, s.y); await page.mouse.move(s.x + 0.5, s.y);
+    await expect(page.locator('#pickTip')).toHaveText('Curved face: pick a flat face or a plane');
+    await page.mouse.move(body.x, body.y); await page.mouse.move(body.x + 0.5, body.y);
+    await expect(page.locator('#pickTip')).toHaveText('Select a plane or planar face');
+    expect(orangeish(await pixelAt(page, body.x, body.y))).toBe(true); // the face glows orange
+    await page.mouse.click(body.x, body.y);
+    await expect(page.locator('#msg')).toHaveText('Sketch2 started on Face of Body1. Type l, rec or c to draw.');
+    await settle(page);
+    expect(await page.evaluate(() => (window as any).__caddy.cam.phi)).toBeLessThan(0.01); // looking straight at the face
+    // the body is still solid (other sketches ghost bodies to 22 %)
+    const face = await at(page, 45, 30), c = await pixelAt(page, face.x, face.y);
+    expect(Math.max(...c)).toBeLessThan(0xa0);
+
+    await typeCommand(page, 'c');
+    const near = async (x: number, y: number) => { const p = await at(page, x, y); await page.mouse.move(p.x + 3, p.y + 2); await page.mouse.move(p.x + 2, p.y + 2); };
+    await near(60, 40); await expect(page.locator('#snap span')).toHaveText('Endpoint');
+    await near(30, 0); await expect(page.locator('#snap span')).toHaveText('Midpoint');
+    await near(24, 20); await expect(page.locator('#snap span')).toHaveText('Quadrant');
+    await near(20, 20); await expect(page.locator('#snap span')).toHaveText('Center');
+    // a circle centered on the hole, then cut it down as a counterbore
+    const p = await at(page, 20, 20);
+    await page.mouse.click(p.x + 2, p.y + 2);
+    await near(27, 23);
+    await page.keyboard.type('14'); await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
+    // the circle sits exactly on the hole's own center (the hole was placed by a click, so that is within a pixel of 20, 20)
+    const got = await page.evaluate(() => { const c = (window as any).__caddy, sk = c.state.sketch, cc = sk.curves[0], h = c.state.features.find((f: any) => f.type === 'hole').params.pts[0].p; return [sk.pts[cc.c].x - h[0], sk.pts[cc.c].y - h[1]]; });
+    expect(Math.hypot(got[0], got[1])).toBeLessThan(1e-9);
+    await typeCommand(page, 'fs');
+    await typeCommand(page, 'ex');
+    await page.keyboard.type('-3');
+    await expect(page.locator('input[name="f-operation"][value="Cut"]')).toBeChecked();
+    await page.keyboard.press('Enter');
+    const r = await built(page);
+    expect(r.features.every((f: any) => !f.error)).toBe(true);
+    expect(60 * 40 * 8 - r.bodies[0].volume).toBeCloseTo(Math.PI * 16 * 8 + Math.PI * (49 - 16) * 3, 5);
+    expect(errors).toEqual([]);
+  });
+});

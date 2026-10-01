@@ -6,7 +6,9 @@ import { parseExpr } from '../core/expr';
 import { icon } from '../core/icons';
 import { emit, on } from '../app/hub';
 import { markDirty, regenerate } from '../app/regenerate';
+import { shownBodies } from '../app/solids';
 import { feats, state } from '../app/state';
+import { faceSnaps } from './facesnaps';
 import { pushUndo } from '../app/undo';
 import type { PlaneRef, SketchFeature } from '../model/types';
 import { cancelDialog } from '../tools/dialog';
@@ -58,6 +60,9 @@ export function enterSketch(sk: SketchFeature, isNew?: boolean): void {
   state.mode = 'sketch';
   state.sketch = sk;
   state.selected = null; state.skSel = null; state.skSels = []; state.skHover = null;
+  // on a body face: bodies stay solid and the face's corners, midpoints and centers become snap points
+  const fs = sk.frame ? faceSnaps(sk.frame, shownBodies(), !!sk.params.ref && sk.params.ref.kind === 'face') : { onFace: false, ext: [] };
+  sk.onFace = fs.onFace; sk.ext = fs.ext;
   sk.status = analyze(sk);
   setSketchOnTop(true);
   buildSketchVisual(sk);

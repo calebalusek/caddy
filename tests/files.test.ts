@@ -50,6 +50,14 @@ describe('project files', () => {
     expect(r.bodies[0].faces.filter((f) => !f.planar)).toHaveLength(2); // hole wall + fillet
   });
 
+  it('opens a version 1 file with Revolve and Hole: exact washer minus the drilled hole', () => {
+    const { features, steps } = open(v1('revolve-hole'));
+    expect(features.map((f) => f.type)).toEqual(['sketch', 'revolve', 'hole']);
+    const r = buildModel(steps);
+    expect(r.steps.filter((s) => s.error)).toEqual([]);
+    expect(r.bodies[0].volume).toBeCloseTo(Math.PI * 300 * 5 - Math.PI * 4 * 5, 5);
+  });
+
   it('round-trips: save as version 2, open again, identical model', () => {
     const first = open(v1('plate-pocket-fillet'));
     first.features.filter((f) => f.type === 'sketch').forEach((s, i) => { if (s.type === 'sketch') s.hist = ['snapshot-' + i]; });

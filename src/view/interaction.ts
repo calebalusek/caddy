@@ -7,7 +7,8 @@ import { baseBody, rebuildSolids, shownBodies } from '../app/solids';
 import { feats, featById, state, type Selection } from '../app/state';
 import { edgeToRef, refIs } from '../kernel/match';
 import type { EdgeRef } from '../kernel/protocol';
-import type { SketchFeature } from '../model/types';
+import { frameFromFace } from '../model/frames';
+import type { PlaneRef, SketchFeature } from '../model/types';
 import { curvePts } from '../sketch/model';
 import { enterSketch, selectSketch } from '../sketch/session';
 import { sketchClick, sketchMove } from '../sketch/tools';
@@ -68,6 +69,18 @@ function solidHit(): Hit | null {
   return best ? best.r : null;
 }
 
+/** While a tool asks for a plane: the plane or body face under the cursor (curved faces are reported so the tip can say why not). */
+function pickTarget(): { kind: 'plane'; vis: PlaneVis } | { kind: 'face'; sel: Extract<Selection, { kind: 'face' }> } | { kind: 'curved' } | null {
+  const pl = planeUnderCursor(), fh = faceAtCursor();
+  // a solid body under the cursor wins over the see-through planes around it (those can still be picked beside the body, or in the Browser)
+  if (fh) {
+    if (!fh.face.planar) return { kind: 'curved' };
+    const f = fh.face, key = 'f' + fh.bodyId + ':' + f.id;
+    return { kind: 'face', sel: { kind: 'face', key, bodyId: fh.bodyId, faceId: f.id, planar: true, n: f.n, p: [fh.point.x, fh.point.y, fh.point.z], surf: f.surf } };
+  }
+  return pl ? { kind: 'plane', vis: pl.vis } : null;
+}
+
 function setHover(h: Hit | null): void {
   const key = h ? h.key : null;
   if (key === state.hoverKey) return;
@@ -85,10 +98,11 @@ export function clearHover(): void {
 
 export function hoverMove(e: PointerEvent): void {
   if (state.pick) {
-    const pl = planeUnderCursor();
-    setHover(pl ? { kind: 'plane', vis: pl.vis, key: pl.vis.key } : null);
-    canvas.style.cursor = pl ? 'pointer' : '';
-    showPickTip();
+    // a tool is asking for a plane: planes and flat body faces can be picked, whichever is in front
+    const t = pickTarget();
+    setHover(t && t.kind === 'plane' ? { kind: 'plane', vis: t.vis, key: t.vis.key } : t && t.kind === 'face' ? { kind: 'face', key: t.sel.key, sel: t.sel } : null);
+    canvas.style.cursor = t && t.kind !== 'curved' ? 'pointer' : '';
+    showPickTip(t && t.kind === 'curved' ? 'Curved face: pick a flat face or a plane' : undefined);
     return;
   }
   if (state.mode === 'sketch') { sketchMove(e); return; }
@@ -145,12 +159,16 @@ function toggleSelection(sel: Selection, shift: boolean): void {
 export function clickAt(e: PointerEvent): void {
   if (e.button !== 0) return;
   if (state.pick) {
-    const pl = planeUnderCursor();
-    if (!pl) return;
+    const t = pickTarget();
+    if (!t) return;
+    if (t.kind === 'curved') { message('That face is curved. Pick a flat face or a plane.', 'warn'); return; }
     const p = state.pick;
+    let ref: PlaneRef;
+    if (t.kind === 'plane') ref = t.vis.ref;
+    else { const id = t.sel.bodyId, b = state.bodies.find((x) => x.id === id); ref = { kind: 'face', frame: frameFromFace(t.sel.n, t.sel.p), bodyName: b ? b.name : 'body' }; }
     endPick();
     clearHover();
-    p.onPick(pl.vis.ref);
+    p.onPick(ref);
     return;
   }
   if (state.mode === 'sketch') { sketchClick(e); return; }

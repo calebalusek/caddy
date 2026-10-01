@@ -71,9 +71,10 @@ export function clearSelection(): void {
 }
 
 /** Show the pick prompt next to the cursor while a tool asks for a plane. */
-export function showPickTip(): void {
+export function showPickTip(problem?: string): void {
   if (!state.pick) return;
-  pickTip.textContent = state.pick.prompt;
+  pickTip.textContent = problem || state.pick.prompt;
+  pickTip.classList.toggle('bad', !!problem);
   pickTip.style.display = 'block';
   pickTip.style.transform = `translate(${Math.round(mouse.x + 14)}px, ${Math.round(mouse.y + 20)}px)`;
 }

@@ -3,10 +3,10 @@
  "version": 1,
  "app": "CADDY prototype",
  "units": "mm",
- "id": "prj-mup2kquhts3zc",
+ "id": "prj-mupnbxxvbvfiz",
  "name": "plate-pocket-fillet",
- "created": 1790831061737,
- "modified": 1790831063746,
+ "created": 1790865922963,
+ "modified": 1790865924918,
  "counters": {
   "sketch": 2,
   "extrude": 2,
@@ -22,13 +22,13 @@
  "lastExtrude": -3,
  "originPlanesVisible": false,
  "view": {
-  "theta": -1.4210393556045566,
-  "phi": 0.26834992234417576,
-  "r": 140.70032202888967,
+  "theta": -1.3428824375392925,
+  "phi": 0.40787762385498416,
+  "r": 157.27689027966775,
   "target": [
-   26.064525186297708,
-   24.752700248396945,
-   6.117944843958966
+   24.010633603704846,
+   22.01417813827313,
+   6.424051193673526
   ]
  },
  "bodies": [

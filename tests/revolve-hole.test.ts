@@ -114,3 +114,22 @@ describe('hole', () => {
   });
 });
 void newId;
+
+describe('sketch on a face: snap points from the body', () => {
+  it('plate 60 × 40 with a Ø8 hole at (20,20): corners, edge midpoints, hole center and quarter points; a sketch above the part gets none', async () => {
+    const { faceSnaps } = await import('../src/sketch/facesnaps');
+    const { frameFromFace, offsetFrame } = await import('../src/model/frames');
+    const bodies = buildModel([plate(), hole([onTop(20, 20)], 8)]).bodies;
+    const top = frameFromFace([0, 0, 1], [30, 20, 8]);
+    const r = faceSnaps(top, bodies, false);
+    expect(r.onFace).toBe(true);
+    const has = (kind: string, x: number, y: number): boolean => r.ext.some((s) => s.kind === kind && Math.abs(s.p[0] - x) < 1e-6 && Math.abs(s.p[1] - y) < 1e-6);
+    for (const [x, y] of [[0, 0], [60, 0], [60, 40], [0, 40]]) expect(has('end', x, y)).toBe(true);
+    for (const [x, y] of [[30, 0], [60, 20], [30, 40], [0, 20]]) expect(has('mid', x, y)).toBe(true);
+    expect(has('center', 20, 20)).toBe(true);
+    for (const [x, y] of [[24, 20], [20, 24], [16, 20], [20, 16]]) expect(has('quad', x, y)).toBe(true);
+    expect(r.ext).toHaveLength(4 + 4 + 1 + 4);
+    const above = faceSnaps(offsetFrame(ORIGIN.XY, 30), bodies, false);
+    expect(above).toEqual({ onFace: false, ext: [] });
+  });
+});

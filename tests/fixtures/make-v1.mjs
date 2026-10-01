@@ -87,5 +87,14 @@ await feature('fillet', { edges: await edgeRefs([[60, 20, 8]]), r: 2 });
 await feature('chamfer', { edges: await edgeRefs([[0, 20, 8]]), r: 1.5 });
 await save('plate-pocket-fillet');
 
+// ---- 2. a washer made with Revolve, with a Hole drilled through its top face ----
+await page.evaluate(() => window.__caddy.newProject());
+await page.waitForTimeout(300);
+await sketchOn({ kind: 'origin', id: 'XZ' }, [{ rect: [10, 0, 10, 5] }]);
+await page.evaluate(() => { const c = window.__caddy, sk = c.state.features[0]; c.state.selected = { sketchId: sk.id, key: sk.profiles[0].key }; });
+await feature('revolve', { axis: { kind: 'origin', id: 'Z' }, angle: 360 });
+await feature('hole', { pts: [{ kind: 'face', bodyId: 'b1', surf: '', n: [0, 0, 1], w: 5, p: [15, 0, 5] }], d: 4 });
+await save('revolve-hole');
+
 await browser.close();
 void cmd; void at;

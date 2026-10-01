@@ -33,6 +33,10 @@ parts for **3D printing**. Built for the owner and other people to use.
     version 2 (opens version 1), Save window with real Save As, STL / 3MF / STEP export with a
     smoothness setting. Checkpoint 1 reviewed by the owner 2026-10-01: STL printed-path check in a
     slicer was good; asked for the fillet arrow and step-back Ctrl+Z (both done), then step 5.
+  - **Step 5 done** (2026-10-01): Revolve (), Hole with draggable markers
+    (), sketch on a body face with snaps that follow the body
+    (). Both tools preview live on the model through the kernel.
+    **Next: step 6 (Sweep), then step 7 (Shell, Pattern), step 8 (Render view), step 9 (offline + publish).**
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised
@@ -58,7 +62,8 @@ parts for **3D printing**. Built for the owner and other people to use.
   while a tool asks for a plane, the geometry engine loads in the background, a STEP export
   button and a "Smoothness of curved faces" choice (Draft / Standard / Fine) in the export window,
   sketch undo history (last 30 steps) is saved with the project, a selected whole sketch gets
-  the bold blue band.
+  the bold blue band, while a tool asks for a plane a solid body under the cursor wins over the
+  see-through planes around it, Revolve and Hole preview on the real body instead of a see-through shape.
 
 ## Commands
 - `npm run dev` — run the app at http://localhost:5173
