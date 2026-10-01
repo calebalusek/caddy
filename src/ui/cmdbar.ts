@@ -61,7 +61,13 @@ export function hideSugs(): void {
   cmdInput.removeAttribute('aria-activedescendant');
 }
 
+/** iPad mode has no command line: the same guidance is shown as plain text beside the tool's name. */
 export function updatePrompt(): void {
+  updatePromptInner();
+  const g = document.getElementById('tGuide');
+  if (g) g.textContent = !state.active && !state.pick && state.mode !== 'sketch' ? 'Tap a tool above' : cmdInput.placeholder;
+}
+function updatePromptInner(): void {
   const pr = $('#prompt');
   if (state.active) {
     pr.textContent = state.active.def.title;

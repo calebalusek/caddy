@@ -119,10 +119,11 @@ test.describe('where a file goes', () => {
     await page.addInitScript(SHARE_MOCK);
     await page.addInitScript(() => { try { localStorage.removeItem('caddy-save-dest'); } catch { /* */ } });
     const errors = await openApp(page);
-    await page.locator('#devSwitch button[data-device="tablet"]').click();
     await box(page);
+    await page.locator('#devSwitch button[data-device="tablet"]').click();
     await page.evaluate(() => { try { localStorage.removeItem('caddy-save-dest'); } catch { /* */ } });
-    await typeCommand(page, 'save');
+    await page.locator('#fileBtn').click(); // no command line on the iPad: the File menu
+    await page.getByRole('menuitem', { name: /Save to file/ }).click();
     await expect(page.locator('#smWhere input[value="share"]')).toBeChecked();
     await expect(page.locator('#smWhere')).toContainText('Files / Share');
     await expect(page.locator('#smDest')).toContainText('Save to Files');

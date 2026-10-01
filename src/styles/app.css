@@ -461,3 +461,9 @@ body.no-browser .browser{display:none}
 .sm-ready span{color:var(--text-2);white-space:nowrap}
 /* the OK / Cancel row stays in view when a bigger iPad menu has to scroll */
 :root[data-device="tablet"] .dialog .dfoot{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);z-index:1}
+
+/* iPad mode: no command line. The buttons are the way in; the line keeps showing what to do next. */
+.tguide{display:none}
+:root[data-device="tablet"] #cmdInput,:root[data-device="tablet"] .sugs{display:none!important}
+:root[data-device="tablet"] .tguide{display:block;flex:1;min-width:0;color:var(--text-2);font-size:15px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+:root[data-device="tablet"] .cmd{padding-top:2px;padding-bottom:6px}

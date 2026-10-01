@@ -265,9 +265,9 @@ test.describe('iPad mode', () => {
 test('iPad mode: Undo, Esc and Enter buttons stand in for the keys', async ({ page }) => {
   const errors = await openApp(page);
   await expect(page.locator('.touchbar')).toBeHidden();
+  await box(page); // (built with the keyboard commands of desktop mode)
   await page.locator('#devSwitch button[data-device="tablet"]').click();
   await expect(page.locator('.touchbar')).toBeVisible();
-  await box(page);
   await page.locator('.touchbar [data-tb="undo"]').click(); // Undo reopens the extrude menu
   await expect(page.locator('section.dialog')).toBeVisible();
   await page.locator('.touchbar [data-tb="esc"]').click(); // Esc closes it
@@ -276,5 +276,25 @@ test('iPad mode: Undo, Esc and Enter buttons stand in for the keys', async ({ pa
   await page.locator('#f-distance').focus();
   await page.locator('.touchbar [data-tb="enter"]').click(); // Enter finishes it
   await expect(page.locator('section.dialog')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('iPad mode has no command line: buttons only, with the guidance text kept', async ({ page }) => {
+  const errors = await openApp(page);
+  await expect(page.locator('#cmdInput')).toBeVisible();
+  await page.locator('#devSwitch button[data-device="tablet"]').click();
+  await expect(page.locator('#cmdInput')).toBeHidden();
+  await expect(page.locator('#tGuide')).toHaveText('Tap a tool above');
+  await page.keyboard.type('sk'); // a keyboard attached to the iPad does not start commands either
+  await expect(page.locator('#prompt')).toHaveText('Command');
+  await page.locator('.tbtn[data-cmd="sketch"]').click(); // the toolbar is the way in
+  await expect(page.locator('#msg')).toContainText('plane');
+  await page.locator('#tree [data-ref="origin:XY"]').click();
+  await page.waitForTimeout(700);
+  await page.locator('.tbtn[data-cmd="rectangle"]').click();
+  await expect(page.locator('#tGuide')).not.toHaveText('Tap a tool above'); // still tells what to do next
+  await expect(page.locator('#tGuide')).not.toBeEmpty();
+  await page.locator('#devSwitch button[data-device="desktop"]').click();
+  await expect(page.locator('#cmdInput')).toBeVisible(); // desktop is unchanged
   expect(errors).toEqual([]);
 });

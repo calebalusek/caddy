@@ -70,6 +70,6 @@ export function initKeyboard(): void {
       if (state.last) { e.preventDefault(); runCommand(state.last); }
       return;
     }
-    if (e.key.length === 1 && /\S/.test(e.key)) { e.preventDefault(); typeIntoCommand(e.key); }
+    if (e.key.length === 1 && /\S/.test(e.key) && state.device !== 'tablet') { e.preventDefault(); typeIntoCommand(e.key); } // no command line on the iPad
   });
 }
