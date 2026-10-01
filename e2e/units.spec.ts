@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { openApp, screenOf, settle, typeCommand } from './helpers';
+import { openApp, settle, typeCommand } from './helpers';
 
 const at = (page: Page, x: number, y: number) => page.evaluate(([a, b]) => (window as any).__caddy.sketchScreen(a, b), [x, y]) as Promise<{ x: number; y: number }>;
 const built = (page: Page) => page.evaluate(async () => { await new Promise((r) => setTimeout(r, 400)); await (window as any).__caddy.whenBuilt(); return (window as any).__caddy.baseBodies().map((b: any) => b.volume); });
