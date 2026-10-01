@@ -2,6 +2,7 @@
 // cut…) or of whole bodies, in a grid, fitted between two edges, or around an axis.
 // The result previews live on the model through the kernel.
 import { emit } from '../app/hub';
+import { fmtU } from '../core/units';
 import { markDirty } from '../app/regenerate';
 import { baseBodies, baseBody, whenBuilt } from '../app/solids';
 import { bodyById, featById, feats, state } from '../app/state';
@@ -140,7 +141,7 @@ registerTool<PatternParams>({
   chips: (A: Dlg) => {
     const P = A.params, m = mode(A);
     const names = P.what === 'Bodies' ? P.bodies.map((id) => bodyById(id)?.name || 'a body') : P.feats.map((id) => featById(id)?.name || 'a feature');
-    const edgeText = (e: { a: Vec3; b: Vec3 } | null, ask: string): string => (e ? `Edge of ${fmtLen(vlen(vsub(e.b, e.a)))} mm` : ask);
+    const edgeText = (e: { a: Vec3; b: Vec3 } | null, ask: string): string => (e ? `Edge of ${fmtU(vlen(vsub(e.b, e.a)))}` : ask);
     return {
       copyChip: { set: names.length > 0, picking: m === 'copy', text: names.length ? names.join(', ') : P.what === 'Bodies' ? 'Click a body to copy' : 'Click a face of the feature to copy' },
       v1Chip: { set: !!P.v1, picking: m === 'v1', text: P.v1 ? 'Edge direction set' : 'Click a straight edge' },
@@ -283,4 +284,3 @@ registerTool<PatternParams>({
   },
 });
 
-const fmtLen = (v: number): string => String(Math.round(v * 100) / 100);

@@ -2,10 +2,10 @@
 // Click a round face. The pitch is the standard coarse one for its diameter unless you set your own.
 // Threads are modeled for real, so they take a few seconds to build.
 import { emit } from '../app/hub';
+import { fmtU } from '../core/units';
 import { markDirty } from '../app/regenerate';
 import { whenBuilt } from '../app/solids';
 import { bodyById, state } from '../app/state';
-import { fmt } from '../core/format';
 import type { BuildStep, FaceSpec } from '../kernel/protocol';
 import type { OtherFeature, Vec3 } from '../model/types';
 import { message } from '../ui/message';
@@ -81,7 +81,7 @@ registerTool<ThreadParams>({
     state.selection = [];
     markDirty();
     const feat = f;
-    message(`${feat.name}: ${A.info || 'thread'}${P.length > 0 ? `, ${fmt(P.length)} mm long` : ''}`, 'ok');
+    message(`${feat.name}: ${A.info || 'thread'}${P.length > 0 ? `, ${fmtU(P.length)} long` : ''}`, 'ok');
     setTimeout(() => void whenBuilt().then(() => { if (feat.error) { message(`${feat.name} needs attention: ${feat.note}`, 'warn'); emit('doc'); } }), 0);
     return true;
   },

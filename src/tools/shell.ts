@@ -1,10 +1,10 @@
 // Shell (SH): hollow out a body. Click faces to leave open (none = a closed hollow), set the wall
 // thickness, choose Inside or Outside. The result previews live on the body.
 import { emit } from '../app/hub';
+import { fmtU, unitName } from '../core/units';
 import { markDirty } from '../app/regenerate';
 import { baseBody, shownBodies, whenBuilt } from '../app/solids';
 import { bodyById, state } from '../app/state';
-import { fmt } from '../core/format';
 import type { BodyResult, FaceInfo } from '../kernel/protocol';
 import { vadd, vdot, vsc } from '../model/frames';
 import type { OtherFeature, Vec3 } from '../model/types';
@@ -119,14 +119,14 @@ registerTool<ShellParams>({
   onClose: () => { setHoverFace(null); setSelectedFaces([]); },
   commit: (A: Dlg, P) => {
     if (!P.bodyId) { message('Click a face of the body to shell', 'warn'); return false; }
-    if (!(P.thickness > 0)) { message('Thickness needs to be more than 0 mm', 'warn'); focusPrimary(); return false; }
+    if (!(P.thickness > 0)) { message(`Thickness needs to be more than 0 ${unitName()}`, 'warn'); focusPrimary(); return false; }
     let f = A.edit as OtherFeature | null;
     if (f) f.params = P as unknown as Record<string, unknown>;
     else { const n = ++state.counters.shell; f = { id: 'sh' + n, type: 'shell', name: 'Shell' + n, params: P as unknown as Record<string, unknown>, bodyId: P.bodyId }; state.features.push(f); }
     state.selection = [];
     markDirty();
     const feat = f;
-    message(`${feat.name}: ${fmt(P.thickness)} mm walls`, 'ok');
+    message(`${feat.name}: ${fmtU(P.thickness)} walls`, 'ok');
     setTimeout(() => void whenBuilt().then(() => { if (feat.error) { message(`${feat.name} needs attention: ${feat.note}`, 'warn'); emit('doc'); } }), 0);
     return true;
   },

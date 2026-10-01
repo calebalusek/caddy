@@ -1,9 +1,9 @@
 // Fillet (F) and Chamfer (CHA): round or bevel body edges. The result previews live on the body.
 import { emit } from '../app/hub';
+import { fmtU, unitName } from '../core/units';
 import { markDirty } from '../app/regenerate';
 import { baseBodies, baseBody, whenBuilt } from '../app/solids';
 import { state } from '../app/state';
-import { fmt } from '../core/format';
 import { edgeToRef, matchEdge, refIs } from '../kernel/match';
 import type { BodyResult, EdgeInfo, EdgeRef } from '../kernel/protocol';
 import { vadd, vcross, vdot, vnorm, vsc, vsub } from '../model/frames';
@@ -121,14 +121,14 @@ function make(kind: 'fillet' | 'chamfer'): ToolDef<FilletParams> {
     onClose: () => { setHoverEdge(null); setHoverFace(null); setBoldSegments([]); },
     commit: (A: Dlg, P) => {
       if (!P.edges.length) { message('Click at least one edge first', 'warn'); return false; }
-      if (!(P.r > 0)) { message(`${word} size needs to be more than 0 mm`, 'warn'); focusPrimary(); return false; }
+      if (!(P.r > 0)) { message(`${word} size needs to be more than 0 ${unitName()}`, 'warn'); focusPrimary(); return false; }
       let f = A.edit as OtherFeature | null;
       if (f) f.params = P as unknown as Record<string, unknown>;
       else { const n = ++state.counters.fillet; f = { id: 'f' + n, type: 'fillet', name: word + n, params: P as unknown as Record<string, unknown> }; state.features.push(f); }
       state.selection = [];
       markDirty();
       const feat = f;
-      message(`${feat.name}: ${P.edges.length} edge${P.edges.length > 1 ? 's' : ''}, ${kind === 'chamfer' ? '' : 'R'}${fmt(P.r)} mm`, 'ok');
+      message(`${feat.name}: ${P.edges.length} edge${P.edges.length > 1 ? 's' : ''}, ${kind === 'chamfer' ? '' : 'R'}${fmtU(P.r)}`, 'ok');
       setTimeout(() => void whenBuilt().then(() => { if (feat.error) { message(`${feat.name} needs attention: ${feat.note}`, 'warn'); emit('doc'); } }), 0);
       return true;
     },

@@ -1,6 +1,7 @@
 // Top bar and viewport chrome: theme, device mode, File menu, project name, Design/Render switch, tips.
 import { $, root, storage } from '../core/dom';
 import { icon } from '../core/icons';
+import { getUnit, setUnitValue, type Unit } from '../core/units';
 import { renderDocName, runCommand, startDocRename } from '../app/commands';
 import { emit } from '../app/hub';
 import { state } from '../app/state';
@@ -54,6 +55,22 @@ function initDevice(): void {
   apply(storage.get('caddy-device') || 'desktop');
 }
 
+/** The mm / in switch at the top right. Lengths are stored in mm either way; this changes what is shown and typed. */
+function initUnits(): void {
+  const apply = (u: Unit, say: boolean): void => {
+    setUnitValue(u);
+    document.querySelectorAll<HTMLElement>('#unitSwitch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.unit === u)));
+    storage.set('caddy-units', u);
+    emit('units');
+    if (say) message(u === 'in' ? 'Inches: sizes are shown and typed in inches, and the grid is in inches. The model itself is unchanged.' : 'Millimeters: sizes are shown and typed in millimeters.');
+  };
+  $('#unitSwitch').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>('button[data-unit]');
+    if (b && b.dataset.unit !== getUnit()) apply(b.dataset.unit as Unit, true);
+  });
+  apply(storage.get('caddy-units') === 'in' ? 'in' : 'mm', false);
+}
+
 function initFileMenu(): void {
   $('#fileBtn').addEventListener('click', (e) => {
     const btn = e.currentTarget as HTMLElement, b = btn.getBoundingClientRect();
@@ -85,6 +102,7 @@ function initViewMode(): void {
 export function initChrome(): void {
   initTheme();
   initDevice();
+  initUnits();
   initFileMenu();
   initViewMode();
   $('#startClose').innerHTML = icon('close');

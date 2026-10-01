@@ -1,6 +1,7 @@
 // The 3D viewport: renderer, camera, lights, grid, origin and shared materials.
 import * as THREE from 'three';
 import { $, cssv } from '../core/dom';
+import { gridSizes } from '../core/units';
 import { on } from '../app/hub';
 import { state } from '../app/state';
 
@@ -71,8 +72,15 @@ function gridGeo(step: number, extent: number, skip: number): THREE.BufferGeomet
 export const gridGroup = new THREE.Group();
 gridGroup.position.z = -0.06;
 const gridMinorMat = new THREE.LineBasicMaterial(), gridMajorMat = new THREE.LineBasicMaterial();
-gridGroup.add(new THREE.LineSegments(gridGeo(10, 150, 50), gridMinorMat));
-gridGroup.add(new THREE.LineSegments(gridGeo(50, 150, 0), gridMajorMat));
+/** The base grid follows the unit: 10 / 50 mm lines in millimeters, 0.5 / 2.5 in lines in inches. */
+function buildGrid(): void {
+  while (gridGroup.children.length) { const c = gridGroup.children[0] as THREE.LineSegments; gridGroup.remove(c); c.geometry.dispose(); }
+  const g = gridSizes();
+  gridGroup.add(new THREE.LineSegments(gridGeo(g.minor, g.extent, g.major), gridMinorMat));
+  gridGroup.add(new THREE.LineSegments(gridGeo(g.major, g.extent, 0), gridMajorMat));
+}
+buildGrid();
+on('units', buildGrid);
 scene.add(gridGroup);
 
 export const originGroup = new THREE.Group();

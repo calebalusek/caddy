@@ -1,5 +1,6 @@
 // Where a dimension's lines, arrows and label go (in sketch coordinates). Carried over from the prototype.
 import { fmt } from '../core/format';
+import { fmtLen } from '../core/units';
 import { arcSweep, cmap, d2, PT, type ArcCurve, type CircleCurve, type Constraint, type Curve, type LineCurve, type P2, type SketchData } from './model';
 import { lineInter, lineUnit } from './solver';
 
@@ -112,7 +113,7 @@ export function dimGeom(sk: SketchData, c: Constraint, M: CMap, k = 0.3): { segs
 }
 
 export const dimText = (c: Constraint): string =>
-  (c.driven ? '(' : '') + (c.type === 'diameter' ? 'Ø' : c.type === 'radius' ? 'R' : c.type === 'flats' ? 'AF ' : '') + fmt(c.v!) + (c.type === 'angle' ? '°' : '') + (c.driven ? ')' : '');
+  (c.driven ? '(' : '') + (c.type === 'diameter' ? 'Ø' : c.type === 'radius' ? 'R' : c.type === 'flats' ? 'AF ' : '') + (c.type === 'angle' ? fmt(c.v!) + '°' : fmtLen(c.v!)) + (c.driven ? ')' : '');
 
 /** Dragging a dimension label to q moves its line there. */
 export function moveDim(sk: SketchData, c: Constraint | undefined, q: P2): void {

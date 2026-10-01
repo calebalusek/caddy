@@ -90,6 +90,8 @@ body.dropping .viewport::after{content:"Drop a CADDY file to open it";position:a
 .devswitch{display:flex;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:2px;gap:2px}
 .devswitch button{display:flex;align-items:center;gap:6px;background:transparent;border:0;border-radius:6px;padding:4px 10px;font-size:13px;color:var(--text-2);cursor:pointer}
 .devswitch button svg.i{width:17px;height:17px}
+.unitswitch button{padding:4px 11px;font-weight:500;min-width:36px;justify-content:center}
+.unitswitch button[aria-pressed="true"]{color:var(--text)}
 .devswitch button[aria-pressed="true"]{background:var(--panel);color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.15)}
 .devswitch button[aria-pressed="true"] svg.i{color:var(--c-sketch)}
 .devnote{display:none;font-size:12px;color:var(--c-print);border:1px dashed var(--c-print);border-radius:999px;padding:1px 9px;white-space:nowrap}

@@ -3,6 +3,7 @@
 // values start at 0, Enter/Esc, typed math, the drag arrow, docking and the remembered position.
 import * as THREE from 'three';
 import { $, cssv, esc, fmt } from '../core/dom';
+import { dragStep, fmtLen, fmtU, fromUser, getUnit, toUser, unitName } from '../core/units';
 import { parseExpr } from '../core/expr';
 import { icon } from '../core/icons';
 import { emit, on } from '../app/hub';
@@ -140,9 +141,9 @@ export function handleDragStart(e: PointerEvent): HandleDrag | null {
 export function handleDragMove(e: PointerEvent, d: HandleDrag, camR: number): void {
   const t = axisParam();
   const v = t === null || d.t0 === null ? d.v0 + (d.y0 - e.clientY) * camR * 0.0025 : d.v0 + (t - d.t0);
-  // smooth: 0.1 mm by default; Shift = whole millimeters, Alt = 0.01
-  const step = e.shiftKey ? 1 : e.altKey ? 0.01 : 0.1;
-  setDistance(+(Math.round(v / step) * step).toFixed(2));
+  // smooth: 0.1 mm (0.005 in) by default; Shift = coarse, Alt = fine. Rounded in the chosen unit, stored in mm.
+  const step = dragStep(e.shiftKey, e.altKey);
+  setDistance(+fromUser(+(Math.round(toUser(v) / step) * step).toFixed(4)).toFixed(6));
 }
 export const overHandle = (): boolean => arrow.visible && ray.intersectObject(arrow.getObjectByName('grab')!, false).length > 0;
 
@@ -160,8 +161,10 @@ onFrame(() => {
 
 // ---- building the menu ----
 function fieldHTML<P>(f: FieldDef<P>, params: any, editing: boolean): string {
-  if (f.kind === 'length')
-    return `<div class="field" data-field="${f.key}"><label for="f-${f.key}">${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}" class="len-input${f.primary ? ' primary' : ''}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${fmt(params[f.key] || 0)}" aria-describedby="h-${f.key}"><span class="unit">${f.unit || 'mm'}</span></div><div class="fhint" id="h-${f.key}"></div></div>`;
+  if (f.kind === 'length') {
+    const isLen = !f.unit || f.unit === 'mm';
+    return `<div class="field" data-field="${f.key}"><label for="f-${f.key}">${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}"${isLen ? ' data-len="1"' : ''} class="len-input${f.primary ? ' primary' : ''}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${isLen ? fmtLen(params[f.key] || 0) : fmt(params[f.key] || 0)}" aria-describedby="h-${f.key}"><span class="unit"${isLen ? ' data-unit-label="1"' : ''}>${isLen ? unitName() : f.unit}</span></div><div class="fhint" id="h-${f.key}"></div></div>`;
+  }
   if (f.kind === 'text')
     return `<div class="field" data-field="${f.key}"><label for="f-${f.key}">${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}" class="txt-input" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="${esc(String(params[f.key] ?? ''))}" placeholder="${esc(f.note || '')}"></div></div>`;
   if (f.kind === 'choice') {
@@ -218,7 +221,7 @@ export function syncFields(): void {
   const A = state.active;
   if (!A) return;
   A.def.fields.concat(A.def.advanced || []).forEach((f) => {
-    if (f.kind === 'length') { const el = dialogEl.querySelector<HTMLInputElement>('#f-' + f.key); if (el) el.value = fmt(A.params[f.key] || 0); }
+    if (f.kind === 'length') { const el = dialogEl.querySelector<HTMLInputElement>('#f-' + f.key); if (el) el.value = el.dataset.len ? fmtLen(A.params[f.key] || 0) : fmt(A.params[f.key] || 0); }
     else if (f.kind === 'text') { const el = dialogEl.querySelector<HTMLInputElement>('#f-' + f.key); if (el) el.value = String(A.params[f.key] ?? ''); }
     else if (f.kind === 'choice') dialogEl.querySelectorAll<HTMLInputElement>(`input[name="f-${f.key}"]`).forEach((i) => { i.checked = i.value === A.params[f.key]; });
   });
@@ -264,7 +267,7 @@ export function updatePreview(): void {
     arrow.userData.dir = h.dir;
     handleAxis.copy(h.base); handleDir.copy(h.axis);
     dimEl.style.display = 'block';
-    dimEl.textContent = fmt(h.value) + ' mm';
+    dimEl.textContent = fmtU(h.value);
     dimEl.classList.toggle('cut', !!res.cut);
   } else { arrow.visible = false; dimEl.style.display = 'none'; }
   const ok = dialogEl.querySelector<HTMLButtonElement>('#okBtn');
@@ -320,7 +323,7 @@ export function refreshHandle(): void {
   arrow.userData.dir = h.dir;
   handleAxis.copy(h.base); handleDir.copy(h.axis);
   dimEl.style.display = 'block';
-  dimEl.textContent = fmt(h.value) + ' mm';
+  dimEl.textContent = fmtU(h.value);
 }
 
 export function setDistance(v: number): void {
@@ -331,7 +334,7 @@ export function setDistance(v: number): void {
   A.params[key] = v;
   const inp = dialogEl.querySelector<HTMLInputElement>('#f-' + key);
   if (inp) {
-    inp.value = fmt(v);
+    inp.value = inp.dataset.len ? fmtLen(v) : fmt(v);
     inp.classList.remove('invalid');
     inp.removeAttribute('aria-invalid');
     const h = dialogEl.querySelector('#h-' + key);
@@ -370,8 +373,18 @@ export function typeIntoDialog(key: string): boolean {
   return true;
 }
 
+/** The unit was switched: the open menu shows its lengths in the new unit. */
+function refreshUnits(): void {
+  const A = state.active;
+  if (!A) return;
+  dialogEl.querySelectorAll<HTMLInputElement>('input[data-len]').forEach((el) => { const v = A.params[el.dataset.key!]; if (typeof v === 'number') { el.value = fmtLen(v); el.classList.remove('invalid'); } });
+  dialogEl.querySelectorAll<HTMLElement>('[data-unit-label]').forEach((s) => { s.textContent = unitName(); });
+  updatePreview();
+}
+
 export function initDialogs(): void {
   makeMovable(dialogEl);
+  on('units', refreshUnits);
   // the bodies were rebuilt: what the tool points at may have moved
   on('built', () => { const A = state.active; if (!A) return; updateChips(); if (A.def.onBuilt) A.def.onBuilt(A); });
   dimEl.addEventListener('click', focusPrimary);
@@ -388,7 +401,7 @@ export function initDialogs(): void {
     } else {
       t.classList.remove('invalid'); t.removeAttribute('aria-invalid');
       hint.textContent = '';
-      A.params[t.dataset.key!] = v;
+      A.params[t.dataset.key!] = t.dataset.len ? fromUser(v) : v;
       updatePreview();
     }
   });
@@ -409,7 +422,8 @@ export function initDialogs(): void {
       e.preventDefault();
       const cur = parseExpr(t.value);
       if (cur === null) return;
-      t.value = fmt(cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
+      const unitStep = t.dataset.len && getUnit() === 'in' ? 0.1 : 1; // an arrow key is 1 mm or 0.1 in
+      t.value = (t.dataset.len ? fmtLen(fromUser(cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1) * unitStep)) : fmt(cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)));
       t.dispatchEvent(new Event('input', { bubbles: true }));
     }
     if (!((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z')) e.stopPropagation();

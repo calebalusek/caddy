@@ -22,7 +22,10 @@
     <button type="button" data-device="desktop" aria-pressed="true" title="Desktop mode: mouse and keyboard"></button>
     <button type="button" data-device="tablet" aria-pressed="false" title="iPad mode: touch and Apple Pencil (coming later)"></button>
   </div>
-  <span class="chip">mm</span>
+  <div class="devswitch unitswitch" id="unitSwitch" role="group" aria-label="Units">
+    <button type="button" data-unit="mm" aria-pressed="true" title="Millimeters">mm</button>
+    <button type="button" data-unit="in" aria-pressed="false" title="Inches">in</button>
+  </div>
   <button class="iconbtn" id="themeBtn" aria-label="Switch light or dark theme" title="Switch theme"></button>
 </header>
 

@@ -39,7 +39,8 @@ import { message } from './ui/message';
 import { initTree } from './ui/tree';
 import { initPointer } from './view/pointer';
 import { initRender, setViewMode } from './view/render';
-import { applyGridVisibility, cam, camera, canvas, startScene, updateCamera, V3 } from './view/scene';
+import type * as THREE from 'three';
+import { applyGridVisibility, gridGroup, cam, camera, canvas, startScene, updateCamera, V3 } from './view/scene';
 import { initViewCube } from './view/viewcube';
 import { addFitSource, initViewsBar } from './view/views';
 import { initSketchSession } from './sketch/session';
@@ -123,4 +124,6 @@ function sketchScreen(x: number, y: number): { x: number; y: number } | null {
 }
 let builtCount = 0;
 on('built', () => { builtCount++; });
-window.__caddy = { setViewMode, builtCount: () => builtCount, state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies: () => previewBodies().map((b) => ({ ...b, faces: (baseBodies().find((x) => x.id === b.id) || { faces: [] }).faces })), baseBodies, projectFile, importFile, flushSave };
+/** How far the thin grid lines reach (test hook). */
+function gridReach(): number { const g = gridGroup.children[0] as THREE.LineSegments; g.geometry.computeBoundingBox(); return g.geometry.boundingBox!.max.x; }
+window.__caddy = { gridReach, setViewMode, builtCount: () => builtCount, state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies: () => previewBodies().map((b) => ({ ...b, faces: (baseBodies().find((x) => x.id === b.id) || { faces: [] }).faces })), baseBodies, projectFile, importFile, flushSave };

@@ -1,7 +1,8 @@
 // Offset plane (PL): a construction plane at a distance from an origin plane, another plane or a flat face.
 import { markDirty, resolveRef } from '../app/regenerate';
+import { fmtU } from '../core/units';
 import { state } from '../app/state';
-import { fmt } from '../core/dom';
+
 import { offsetFrame, toWorld } from '../model/frames';
 import type { PlaneFeature, PlaneRef } from '../model/types';
 import { message } from '../ui/message';
@@ -67,12 +68,12 @@ registerTool<PlaneParams>({
     if (!P.ref) { message('Pick a plane or flat face first', 'warn'); pickReference(); return false; }
     if (A.edit) {
       (A.edit as PlaneFeature).params = P;
-      message(`${A.edit.name} set to ${fmt(P.distance)} mm from ${planeName(P.ref)}`, 'ok');
+      message(`${A.edit.name} set to ${fmtU(P.distance)} from ${planeName(P.ref)}`, 'ok');
     } else {
       const n = ++state.counters.plane;
       const f: PlaneFeature = { id: 'p' + n, type: 'plane', name: 'Plane' + n, params: P, visible: true };
       state.features.push(f);
-      message(`${f.name} created ${fmt(P.distance)} mm from ${planeName(P.ref)}. Type sk to sketch on it.`, 'ok');
+      message(`${f.name} created ${fmtU(P.distance)} from ${planeName(P.ref)}. Type sk to sketch on it.`, 'ok');
     }
     state.selection = [];
     markDirty();

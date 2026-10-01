@@ -1,11 +1,11 @@
 // Extrude (EX): pull a sketch region or a flat body face into a solid. Join, Cut or New body is
 // picked automatically from where the extrude goes; the user can override it.
 import * as THREE from 'three';
+import { fmtU, unitName } from '../core/units';
 import { emit } from '../app/hub';
 import { markDirty } from '../app/regenerate';
 import { baseBody, findProfile, whenBuilt } from '../app/solids';
 import { bodyById, feats, state, type ProfileSel } from '../app/state';
-import { fmt } from '../core/format';
 import type { FaceSpec, Operation } from '../kernel/protocol';
 import { extrudeRange } from '../kernel/spec';
 import { frameFromFace, toWorld, vdot, vnorm } from '../model/frames';
@@ -195,7 +195,7 @@ registerTool<ExtrudeParams>({
   commit: (A: Dlg, P) => {
     const src = source(P);
     if (!src) { message('Click a profile in the viewport to extrude', 'warn'); return false; }
-    if (extrudeRange(P.distance, P.direction, P.offset || 0).depth < 0.01) { message('Distance needs to be more than 0 mm', 'warn'); focusPrimary(); return false; }
+    if (extrudeRange(P.distance, P.direction, P.offset || 0).depth < 0.01) { message(`Distance needs to be more than 0 ${unitName()}`, 'warn'); focusPrimary(); return false; }
     P.opAuto = false;
     const opWord = P.operation === 'Cut' ? 'cut' : 'extruded';
     let f: OtherFeature;
@@ -203,7 +203,7 @@ registerTool<ExtrudeParams>({
     if (A.edit) {
       f = A.edit as OtherFeature;
       f.params = P as unknown as Record<string, unknown>;
-      said = `${f.name} updated to ${fmt(P.distance)} mm`;
+      said = `${f.name} updated to ${fmtU(P.distance)}`;
     } else {
       const n = ++state.counters.extrude;
       f = { id: 'e' + n, type: 'extrude', name: (P.operation === 'Cut' ? 'Cut' : 'Extrude') + n, params: P as unknown as Record<string, unknown> };
@@ -220,7 +220,7 @@ registerTool<ExtrudeParams>({
       if (body) f.bodyId = body.id;
       state.features.push(f);
       state.selected = null; state.treeSel = null; state.selection = [];
-      said = `${f.name} ${opWord} ${fmt(Math.abs(P.distance))} mm${body ? (P.operation === 'Join' ? ', joined to ' + body.name : ' as ' + body.name) : ''}`;
+      said = `${f.name} ${opWord} ${fmtU(Math.abs(P.distance))}${body ? (P.operation === 'Join' ? ', joined to ' + body.name : ' as ' + body.name) : ''}`;
     }
     markDirty();
     message(said, 'ok');

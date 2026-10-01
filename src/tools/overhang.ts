@@ -2,6 +2,7 @@
 // support when printed. A view, not a feature: nothing is added to the History.
 // Red = a flat ceiling, yellow = just past the limit. The limit is the printer's overhang angle.
 import * as THREE from 'three';
+import { fmtArea } from '../core/units';
 import { baseBodies } from '../app/solids';
 import { state } from '../app/state';
 import { cssv } from '../core/dom';
@@ -42,7 +43,7 @@ function show(A: Dlg | null): void {
   overlay.geometry = g;
   overlay.visible = o.tris.length > 0;
   const pct = o.total > 0 ? (100 * o.area) / o.total : 0;
-  setHint('h-angle', !meshes.length ? 'Make a body first' : o.area < 0.01 ? 'Nothing needs support at this angle' : `${fmt(Math.round(o.area * 10) / 10)} mm² need support (${fmt(Math.round(pct * 10) / 10)} % of the surface)`);
+  setHint('h-angle', !meshes.length ? 'Make a body first' : o.area < 0.01 ? 'Nothing needs support at this angle' : `${fmtArea(o.area)} need support (${fmt(Math.round(pct * 10) / 10)} % of the surface)`);
 }
 
 function pickBed(): void {

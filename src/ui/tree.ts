@@ -1,5 +1,6 @@
 // Browser panel (left), History bar (bottom), their right-click menus and renaming.
 import { $, esc, fmt } from '../core/dom';
+import { fmtU } from '../core/units';
 import { icon } from '../core/icons';
 import { emit, on } from '../app/hub';
 import { deleteBody, deleteFeature, markDirty, toggleVis } from '../app/history';
@@ -112,16 +113,16 @@ function tip(f: Feature): string {
   const p = f.params as any;
   switch (f.type) {
     case 'sketch': return f.name;
-    case 'shell': return `${f.name}: ${fmt(p.thickness)} mm walls`;
+    case 'shell': return `${f.name}: ${fmtU(p.thickness)} walls`;
     case 'pattern': return `${f.name}: ${String(p.ptype).toLowerCase()} pattern`;
     case 'mirror': return `${f.name}: ${(p.bodies || []).length} bod${(p.bodies || []).length === 1 ? 'y' : 'ies'} mirrored`;
     case 'text': return `${f.name}: "${String(p.text).slice(0, 24)}"`;
-    case 'thread': return `${f.name}: ${p.kind === 'Internal' ? 'internal' : 'external'} thread, ${fmt(p.pitch)} mm pitch`;
+    case 'thread': return `${f.name}: ${p.kind === 'Internal' ? 'internal' : 'external'} thread, ${fmtU(p.pitch)} pitch`;
     case 'sweep': return `${f.name} along a path`;
     case 'revolve': return `${f.name}, ${fmt(Math.abs(p.angle))}°`;
-    case 'hole': return `${f.name}, Ø${fmt(p.d)} mm`;
-    case 'fillet': return `${f.name}, ${p.edges.length} edge${p.edges.length > 1 ? 's' : ''}, ${p.kind === 'chamfer' ? '' : 'R'}${fmt(p.r)} mm`;
-    default: return `${f.name}, ${fmt(p.distance)} mm`;
+    case 'hole': return `${f.name}, Ø${fmtU(p.d)}`;
+    case 'fillet': return `${f.name}, ${p.edges.length} edge${p.edges.length > 1 ? 's' : ''}, ${p.kind === 'chamfer' ? '' : 'R'}${fmtU(p.r)}`;
+    default: return `${f.name}, ${fmtU(p.distance)}`;
   }
 }
 export function renderTimeline(): void {
@@ -266,6 +267,7 @@ export function initTree(): void {
 
   const render = (): void => { renderTree(); renderTimeline(); };
   on('doc', render);
+  on('units', render);
   on('mode', render);
   // Hover also fires 'select'; only redraw the Browser when the selection itself changed.
   let selSig = '';

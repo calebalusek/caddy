@@ -1,12 +1,12 @@
 // Hole (HO): simple, counterbore or countersink holes on flat faces or sketch points.
 // Each hole shows a marker (ring + crosshair, blue; orange on hover) that can be dragged along its face.
 import * as THREE from 'three';
+import { fmtU } from '../core/units';
 import { emit, on } from '../app/hub';
 import { markDirty } from '../app/regenerate';
 import { baseBody, whenBuilt } from '../app/solids';
 import { feats, state } from '../app/state';
 import { cssv } from '../core/dom';
-import { fmt } from '../core/format';
 import type { BuildStep } from '../kernel/protocol';
 import { vadd, vcross, vdot, vnorm, vsc, vsub } from '../model/frames';
 import { holeSpot, type HoleRef } from '../model/steps';
@@ -264,7 +264,7 @@ registerTool<HoleParams>({
     state.selection = [];
     markDirty();
     const feat = f;
-    message(`${feat.name}: ${P.pts.length} × Ø${fmt(P.d)} mm ${P.type.toLowerCase()} ${P.extent === 'Through all' ? 'through all' : fmt(P.depth) + ' mm deep'}`, 'ok');
+    message(`${feat.name}: ${P.pts.length} × Ø${fmtU(P.d)} ${P.type.toLowerCase()} ${P.extent === 'Through all' ? 'through all' : fmtU(P.depth) + ' deep'}`, 'ok');
     setTimeout(() => void whenBuilt().then(() => { if (feat.error) { message(`${feat.name} needs attention: ${feat.note}`, 'warn'); emit('doc'); } }), 0);
     return true;
   },

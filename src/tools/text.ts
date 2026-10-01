@@ -1,10 +1,10 @@
 // Text (TXT): letters on a plane or a flat face, raised (Join / New body) or engraved (Cut).
 // Type the words, then the size and the height. The result previews live on the model.
 import { emit } from '../app/hub';
+import { fmtU } from '../core/units';
 import { markDirty, resolveRef } from '../app/regenerate';
 import { whenBuilt } from '../app/solids';
 import { state } from '../app/state';
-import { fmt } from '../core/format';
 import type { BuildStep, Operation } from '../kernel/protocol';
 import { toWorld, vadd, vsc } from '../model/frames';
 import type { OtherFeature, PlaneRef, Vec3 } from '../model/types';
@@ -132,7 +132,7 @@ registerTool<TextParams>({
     }
     markDirty();
     const feat = f;
-    message(`${feat.name}: "${P.text.length > 24 ? P.text.slice(0, 24) + '…' : P.text}", ${fmt(P.size)} mm letters, ${fmt(P.height)} mm ${P.operation === 'Cut' ? 'deep' : 'high'}`, 'ok');
+    message(`${feat.name}: "${P.text.length > 24 ? P.text.slice(0, 24) + '…' : P.text}", ${fmtU(P.size)} letters, ${fmtU(P.height)} ${P.operation === 'Cut' ? 'deep' : 'high'}`, 'ok');
     setTimeout(() => void whenBuilt().then(() => { if (feat.error) { message(`${feat.name} needs attention: ${feat.note}`, 'warn'); emit('doc'); } }), 0);
     return true;
   },

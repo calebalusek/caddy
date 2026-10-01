@@ -2,10 +2,11 @@
 // constraints and dimensions, offset / move / trim, selection and dragging. Carried over from the
 // prototype tool by tool so the behavior is the same.
 import * as THREE from 'three';
+import { fmtLen, fmtU, fromUser, unitName } from '../core/units';
 import { $ } from '../core/dom';
 import { fmt } from '../core/format';
 import { parseExpr } from '../core/expr';
-import { emit } from '../app/hub';
+import { emit, on } from '../app/hub';
 import { state, type SketchTool, type SkSel } from '../app/state';
 import { toLocal } from '../model/frames';
 import type { SketchFeature } from '../model/types';
@@ -131,7 +132,7 @@ export const hudShown = (): boolean => hud.classList.contains('show');
 // ---- the value boxes that follow the cursor ----
 function showHud(fields?: HudField[]): void {
   const T = state.tool!, f = fields || TOOL_FIELDS[T.type];
-  hud.innerHTML = f.map((x) => `<label class="hf"><span>${x.label}</span><input data-k="${x.k}" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="${x.name}">${x.unit === '' ? '' : '<em>' + (x.unit || 'mm') + '</em>'}</label>`).join('')
+  hud.innerHTML = f.map((x) => `<label class="hf"><span>${x.label}</span><input data-k="${x.k}" inputmode="decimal"${x.unit === undefined ? ' data-len="1"' : ''} autocomplete="off" spellcheck="false" aria-label="${x.name}">${x.unit === '' ? '' : '<em' + (x.unit === undefined ? ' data-ul="1"' : '') + '>' + (x.unit || unitName()) + '</em>'}</label>`).join('')
     + (T.type === 'polygon' && !fields ? `<button type="button" class="hudtog" data-act="polymode" title="Switch between sizing to the corners or across the flats">${state.polyMode === 'flats' ? 'across flats' : 'to corners'}</button>` : '');
   hud.classList.add('show');
   positionHud();
@@ -141,7 +142,7 @@ function fillHud(vals: Record<string, number | undefined>): void {
     if (inp.dataset.locked) return;
     const v = vals[inp.dataset.k!];
     if (v == null || !isFinite(v)) return;
-    inp.value = fmt(v);
+    inp.value = inp.dataset.len ? fmtLen(v) : fmt(v);
     if (document.activeElement === inp) inp.select();
   });
 }
@@ -156,7 +157,7 @@ function focusHud(): void { const inp = hud.querySelector<HTMLInputElement>('inp
 function hudVal(k: string, signed?: boolean): number | null {
   const inp = hud.querySelector<HTMLInputElement>(`[data-k="${k}"]`);
   if (!inp || !inp.dataset.locked) return null;
-  const v = parseExpr(inp.value);
+  const raw = parseExpr(inp.value), v = raw === null || !inp.dataset.len ? raw : fromUser(raw);
   return v === null ? null : signed ? v : Math.abs(v);
 }
 /** A number typed over the viewport goes into the first free value box. */
@@ -345,7 +346,7 @@ export function commitShape(): void {
     const ctr: P2 = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2];
     if (typed('w')) addCon(sk, { type: 'length', l: l1, v: s.w, off: offAway(sk, l1, ctr) }, true);
     if (typed('h')) addCon(sk, { type: 'length', l: l2, v: s.h, off: offAway(sk, l2, ctr) }, true);
-    label = `Rectangle ${fmt(s.w)} × ${fmt(s.h)} mm`;
+    label = `Rectangle ${fmt(s.w)} × ${fmtU(s.h)}`;
   } else if (s.type === 'circle') {
     if (s.r < 0.01) { message('Give the circle a size', 'warn'); return; }
     const Cn = T.pts[0].id || addPt(sk, s.c[0], s.c[1]);
@@ -353,7 +354,7 @@ export function commitShape(): void {
     const id = newId(sk, 'c');
     sk.curves.push({ id, type: 'circle', c: Cn, r: s.r });
     if (typed('d')) addCon(sk, { type: 'diameter', c: id, v: s.d, ang: 0.785 }, true);
-    label = `Circle Ø${fmt(s.d)} mm`;
+    label = `Circle Ø${fmtU(s.d)}`;
   } else if (s.type === 'arc' || s.type === 'arcline') {
     if (s.type === 'arcline') return;
     if (s.bad) { message(hudVal('r') !== null ? 'That radius is too small to reach both ends' : 'Move off the straight line to bend the arc', 'warn'); return; }
@@ -364,7 +365,7 @@ export function commitShape(): void {
     const Q = addPt(sk, s.q[0], s.q[1]), id = newId(sk, 'a');
     sk.curves.push({ id, type: 'arc', c: Q, p1: s.swap ? E : S, p2: s.swap ? S : E, r: s.r });
     if (typed('r')) addCon(sk, { type: 'radius', c: id, v: s.r }, true);
-    label = `Arc R${fmt(s.r)} mm`;
+    label = `Arc R${fmtU(s.r)}`;
   } else if (s.type === 'polygon') {
     if (s.R < 0.01) { message('Give the polygon a size', 'warn'); return; }
     // built on a construction circle: every corner rides on it and all sides are equal
@@ -377,7 +378,7 @@ export function commitShape(): void {
       if (s.flats) { const a = s.pts[0], b = s.pts[1], dx = b[0] - a[0], dy = b[1] - a[1], sd = dx * (s.c[1] - a[1]) - dy * (s.c[0] - a[0]); addCon(sk, { type: 'flats', c: cid, l: lids[0], sgn: Math.sign(sd) || 1, v: s.d }, true); }
       else addCon(sk, { type: 'diameter', c: cid, v: s.d, ang: 0.785 }, true);
     }
-    label = `${s.n}-sided polygon, ${fmt(s.d)} mm ${s.flats ? 'across flats' : 'across corners'}`;
+    label = `${s.n}-sided polygon, ${fmtU(s.d)} ${s.flats ? 'across flats' : 'across corners'}`;
   } else {
     if (s.l < 0.01) { message('Move away from the start point or type a length', 'warn'); return; }
     const P1 = T.pts[0].id || addPt(sk, s.a[0], s.a[1]);
@@ -388,7 +389,7 @@ export function commitShape(): void {
     if (typed('l')) addCon(sk, { type: 'length', l, v: s.l, off: 26 * skScale(sk) }, true);
     if (!T.start.id) T.start.id = P1;
     closed = P2_ === T.start.id;
-    label = `Line ${fmt(s.l)} mm`;
+    label = `Line ${fmtU(s.l)}`;
     T.lastEnd = P2_;
   }
   flushSnaps(sk);
@@ -723,7 +724,7 @@ export function describeSel(sk: SketchFeature, s: SkSel): string {
   if (s.kind === 'point') return s.id === 'O' ? 'Sketch origin' : 'Point';
   if (s.kind === 'curve') {
     const c = curveOf(sk, s.id)!;
-    return c.type === 'line' ? `Line ${fmt(d2(PT(sk, c.p1), PT(sk, c.p2)))} mm` : c.type === 'arc' ? `Arc R${fmt(c.r)} mm` : `Circle Ø${fmt(c.r * 2)} mm`;
+    return c.type === 'line' ? `Line ${fmtU(d2(PT(sk, c.p1), PT(sk, c.p2)))}` : c.type === 'arc' ? `Arc R${fmtU(c.r)}` : `Circle Ø${fmtU(c.r * 2)}`;
   }
   const c = sk.cons.find((x) => x.id === s.id);
   return c ? (isDim(c) ? (c.driven ? 'Reference dimension ' : 'Dimension ') + dimText(c) : TOOL_NAMES[c.type === 'horizontal' || c.type === 'vertical' ? 'hv' : c.type] + ' constraint') : 'Item';
@@ -844,7 +845,7 @@ function commitOffset(): void {
   T.sel = []; T.phase = 'select'; T.cur = null;
   hideHud(); clearToolPreview();
   skChanged(sk);
-  message(`Offset ${fmt(plan.d)} mm. Pick more to offset, or Esc to finish.`, 'ok');
+  message(`Offset ${fmtU(plan.d)}. Pick more to offset, or Esc to finish.`, 'ok');
   if (!plan.typed && mainId) startDimEdit(mainId);
   updatePrompt();
 }
@@ -906,7 +907,7 @@ function commitMove(): void {
   state.skSel = state.skSels[state.skSels.length - 1] || null;
   skChanged(sk); setOverlaySel();
   message(held ? 'Moved only partway: constraints tie it to geometry that stayed put (like Horizontal, Parallel or Coincident with an unmoved line). Delete those to move it freely.'
-    : `Moved ${fmt(dx)}, ${fmt(dy)} mm. Still selected: press Enter or Space to move again.`, held ? 'warn' : 'ok');
+    : `Moved ${fmt(dx)}, ${fmtU(dy)}. Still selected: press Enter or Space to move again.`, held ? 'warn' : 'ok');
 }
 
 // ---- trim ----
@@ -1178,6 +1179,7 @@ export function toolPrompt(): string {
 }
 
 export function initSketchTools(): void {
+  on('units', () => { hud.querySelectorAll<HTMLElement>('em[data-ul]').forEach((e) => { e.textContent = unitName(); }); hud.querySelectorAll<HTMLInputElement>('input[data-len]').forEach((i) => { i.value = ''; delete i.dataset.locked; }); });
   hud.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-act="polymode"]');
     if (!b) return;

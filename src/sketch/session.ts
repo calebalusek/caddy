@@ -1,6 +1,7 @@
 // Sketch editing session: starting, entering and finishing a sketch, the on-screen overlay
 // (dimension labels, constraint badges, the sketch bar) and editing dimension values.
 import { $, esc } from '../core/dom';
+import { fmtLen, fmtU, fromUser, getUnit } from '../core/units';
 import { fmt } from '../core/format';
 import { parseExpr } from '../core/expr';
 import { icon } from '../core/icons';
@@ -241,15 +242,17 @@ export function startDimEdit(id: string): void {
   refreshSketchStyles(sk); setOverlaySel();
   dimEdit.style.display = 'block';
   dimInput.classList.remove('invalid');
-  dimInput.value = c.expr || fmt(c.v!);
+  // a typed expression is kept only in the unit it was typed in
+  dimInput.value = c.expr && (c.eu || 'mm') === getUnit() ? c.expr : c.type === 'angle' ? fmt(c.v!) : fmtLen(c.v!);
   positionOverlay();
   dimInput.focus(); dimInput.select();
   message(`Type a new ${c.type === 'angle' ? 'angle in degrees' : 'size'}. The sketch updates as you type. Enter keeps it, Tab goes to the next dimension, Esc cancels.`);
 }
+const dimIsAngle = (): boolean => { const sk = state.sketch, E = dimEditing, c = sk && E ? sk.cons.find((x) => x.id === E.id) : null; return !!c && c.type === 'angle'; };
 function liveDim(): void {
   const E = dimEditing, sk = state.sketch;
   if (!E || !sk) return;
-  const v = parseExpr(dimInput.value);
+  const c0 = sk.cons.find((x) => x.id === E.id), raw = parseExpr(dimInput.value), v = raw === null || !c0 || c0.type === 'angle' ? raw : fromUser(raw);
   restore(sk, E.snap);
   const c = sk.cons.find((x) => x.id === E.id);
   let ok = !!c && v !== null && validDimValue(c, v);
@@ -264,23 +267,25 @@ export function closeDimEdit(apply: boolean): boolean {
   dimEdit.style.display = 'none';
   const sk = state.sketch;
   if (!sk) return false;
-  const text = dimInput.value.trim(), v = parseExpr(text);
+  const text = dimInput.value.trim(), raw = parseExpr(text);
   restore(sk, E.snap);
-  const c = sk.cons.find((x) => x.id === E.id);
+  const c = sk.cons.find((x) => x.id === E.id), v = raw === null || !c || c.type === 'angle' ? raw : fromUser(raw);
   if (!apply || !c) { skChanged(sk); return false; }
   if (v === null || !validDimValue(c, v)) { skChanged(sk); message(c.type === 'angle' ? 'Enter an angle between 0 and 180°' : 'Enter a size larger than 0', 'warn'); return false; }
-  const expr = /^\s*\d*\.?\d+\s*(mm)?\s*$/i.test(text) ? undefined : text;
+  const expr = /^\s*\d*\.?\d+\s*(mm|in)?\s*$/i.test(text) ? undefined : text;
   if (Math.abs(Math.abs(v) - c.v!) < 1e-9 && expr === c.expr) { skChanged(sk); return true; }
   c.v = Math.abs(v);
-  if (expr) c.expr = expr; else delete c.expr;
-  if (!solveSketch(sk)) { restore(sk, E.snap); skChanged(sk); message(`${fmt(Math.abs(v))} doesn't fit with the other constraints, so the old size was kept.`, 'warn'); return false; }
+  if (expr) { c.expr = expr; c.eu = getUnit(); } else { delete c.expr; delete c.eu; }
+  if (!solveSketch(sk)) { restore(sk, E.snap); skChanged(sk); message(`${c.type === 'angle' ? fmt(Math.abs(v)) : fmtU(Math.abs(v))} doesn't fit with the other constraints, so the old size was kept.`, 'warn'); return false; }
   pushHist(sk, E.snap);
   skChanged(sk);
-  message(`Dimension set to ${fmt(c.v)}${c.type === 'angle' ? '°' : ' mm'}${expr ? ` (${expr})` : ''}. ${DofSentence(sk)}.`, 'ok');
+  message(`Dimension set to ${c.type === 'angle' ? fmt(c.v) + '°' : fmtU(c.v)}${expr ? ` (${expr})` : ''}. ${DofSentence(sk)}.`, 'ok');
   return true;
 }
 
 export function initSketchSession(): void {
+  // inches / millimeters: dimension labels and an open dimension box redraw
+  on('units', () => { const sk = state.sketch; if (!sk) return; buildDimLines(sk); rebuildOverlay(); const E = dimEditing; if (E) { const c = sk.cons.find((x) => x.id === E.id); if (c) dimInput.value = c.type === 'angle' ? fmt(c.v!) : fmtLen(c.v!); } });
   let lastLblClick = { id: '', t: 0 };
   let lblDrag: { id: string; x: number; y: number; moved: boolean; snap: string } | null = null, lblDragEnd = 0;
 
@@ -375,7 +380,7 @@ export function initSketchSession(): void {
     } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
       const cur = parseExpr(dimInput.value);
-      if (cur !== null) { dimInput.value = fmt(cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)); liveDim(); }
+      if (cur !== null) { dimInput.value = fmt(cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1) * (getUnit() === 'in' && !dimIsAngle() ? 0.1 : 1)); liveDim(); }
     }
     e.stopPropagation();
   });

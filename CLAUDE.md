@@ -158,6 +158,10 @@ parts for **3D printing**. Built for the owner and other people to use.
     Origin planes are drawn small (30 mm); an empty sketch still opens with room to draw.
 14. **Holes snap to a face's critical points** (corners, edge middles, the face middle, circle
     centers); Shift-click two of them to put the hole halfway between.
+15. **Units: mm / in switch** (top right, remembered in this browser). The model, files, kernel and exports
+    are always millimeters; the switch only changes what is shown and typed (`src/core/units.ts`:
+    `fmtU`, `fmtLen`, `toUser`, `fromUser`) and the base grid (10 / 50 mm lines, or 0.5 / 2.5 in lines).
+    Any new length field or message must go through those helpers, never a hard-coded " mm".
 9. **Safety with printers**: no G-code / slicer features yet (parked). If ever built, use proven
    engines, conservative per-printer profiles and a mandatory preview.
 
