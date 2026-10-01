@@ -33,9 +33,9 @@ parts for **3D printing**. Built for the owner and other people to use.
     version 2 (opens version 1), Save window with real Save As, STL / 3MF / STEP export with a
     smoothness setting. Checkpoint 1 reviewed by the owner 2026-10-01: STL printed-path check in a
     slicer was good; asked for the fillet arrow and step-back Ctrl+Z (both done), then step 5.
-  - **Step 5 done** (2026-10-01): Revolve (), Hole with draggable markers
-    (), sketch on a body face with snaps that follow the body
-    (). Both tools preview live on the model through the kernel.
+  - **Step 5 done** (2026-10-01): Revolve (`src/tools/revolve.ts`), Hole with draggable markers
+    (`src/tools/hole.ts`), sketch on a body face with snaps that follow the body
+    (`src/sketch/facesnaps.ts`). Both tools preview live on the model through the kernel.
     **Next: step 6 (Sweep), then step 7 (Shell, Pattern), step 8 (Render view), step 9 (offline + publish).**
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
