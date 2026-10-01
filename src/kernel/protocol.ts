@@ -29,7 +29,33 @@ export type BuildStep =
       operation: Operation;
       bodyId: string | null;
     }
-  | { kind: 'fillet'; id: string; mode: 'fillet' | 'chamfer'; r: number; edges: EdgeRef[] };
+  | { kind: 'fillet'; id: string; mode: 'fillet' | 'chamfer'; r: number; edges: EdgeRef[] }
+  | {
+      kind: 'revolve';
+      id: string;
+      profile: ProfileSpec | null;
+      /** A point on the axis and its direction; must lie in the profile's plane. */
+      axis: { A: Vec3; d: Vec3 } | null;
+      /** Degrees: where the sweep starts (measured from the sketch plane) and how far it goes. */
+      ang0: number;
+      angle: number;
+      operation: Operation;
+      bodyId: string | null;
+    }
+  | {
+      kind: 'hole';
+      id: string;
+      /** Where to drill: a fixed spot (from a sketch point), a spot on a body face, or null if its sketch point is gone. */
+      at: (HoleSpot | null)[];
+      d: number;
+      through: boolean;
+      depth: number;
+      type: 'Simple' | 'Counterbore' | 'Countersink';
+      cbD: number;
+      cbDepth: number;
+      csD: number;
+    };
+export type HoleSpot = { c: Vec3; dir: Vec3 } | { face: FaceSpec };
 
 export interface FaceInfo {
   id: number;

@@ -1,11 +1,12 @@
 // From the timeline to what the kernel builds: resolving planes and sketch regions, and turning
 // each solid feature into a build step. No DOM, no three.js: runs in the app and in Node tests.
-import type { BuildStep, EdgeRef, FaceSpec } from '../kernel/protocol';
+import type { BuildStep, EdgeRef, FaceSpec, HoleSpot } from '../kernel/protocol';
 import { extrudeRange, profileSpec } from '../kernel/spec';
 import { profileHint } from '../sketch/geom';
 import { inProfile, sketchProfiles, type Profile } from '../sketch/profiles';
-import { ORIGIN, offsetFrame } from './frames';
-import type { Feature, Frame, PlaneRef, SketchFeature } from './types';
+import { PT } from '../sketch/model';
+import { ORIGIN, offsetFrame, toWorld, vnorm, vsc, vsub } from './frames';
+import type { Feature, Frame, PlaneRef, SketchFeature, Vec3 } from './types';
 
 /** The frame a plane reference points at right now; null if what it refers to is gone or broken. */
 export function resolveRefIn(features: Feature[], ref: PlaneRef | null | undefined): Frame | null {
@@ -62,7 +63,35 @@ export function findProfileIn(features: Feature[], sel: ProfileParams | null | u
 }
 
 /** Which rebuild step brings back a feature type that is not rebuilt yet. */
-export const LATER: Record<string, number> = { revolve: 5, hole: 5, sweep: 6, shell: 7, pattern: 7 };
+export const LATER: Record<string, number> = { sweep: 6, shell: 7, pattern: 7 };
+
+/** How a revolve's axis is saved (same as version 1 files). */
+export type AxisRef = { kind: 'origin'; id: 'X' | 'Y' | 'Z' } | { kind: 'line'; sketchId: string; lineId: string } | { kind: 'edge'; bodyId: string; a: Vec3; b: Vec3 };
+/** The axis in space, with a name for messages. Null if what it pointed at is gone. */
+export function axisWorld(features: Feature[], bodyName: (id: string) => string, ax: AxisRef | null | undefined): { A: Vec3; d: Vec3; name: string } | null {
+  if (!ax) return null;
+  if (ax.kind === 'origin') return { A: [0, 0, 0], d: ax.id === 'X' ? [1, 0, 0] : ax.id === 'Y' ? [0, 1, 0] : [0, 0, 1], name: ax.id + ' axis' };
+  if (ax.kind === 'line') {
+    const sk = features.find((f) => f.id === ax.sketchId);
+    if (!sk || sk.type !== 'sketch' || !sk.frame) return null;
+    const l = sk.curves.find((c) => c.id === ax.lineId);
+    if (!l || l.type !== 'line') return null;
+    const a = toWorld(sk.frame, ...PT(sk, l.p1)), b = toWorld(sk.frame, ...PT(sk, l.p2)), ab = vsub(b, a);
+    if (Math.hypot(ab[0], ab[1], ab[2]) < 1e-6) return null;
+    return { A: a, d: vnorm(ab), name: 'a line in ' + sk.name };
+  }
+  return { A: ax.a, d: vnorm(vsub(ax.b, ax.a)), name: 'an edge of ' + bodyName(ax.bodyId) };
+}
+
+/** How a hole's position is saved (same as version 1 files). */
+export type HoleRef = { kind: 'spt'; sketchId: string; pointId: string } | ({ kind: 'face' } & FaceSpec);
+/** Where a hole is: on a sketch point (drilling into the sketch plane) or on a body face. */
+export function holeSpot(features: Feature[], ref: HoleRef): HoleSpot | null {
+  if (ref.kind === 'face') return { face: { bodyId: ref.bodyId, n: ref.n, w: ref.w, p: ref.p, surf: ref.surf } };
+  const sk = features.find((f) => f.id === ref.sketchId);
+  if (!sk || sk.type !== 'sketch' || !sk.frame || !sk.pts[ref.pointId]) return null;
+  return { c: toWorld(sk.frame, sk.pts[ref.pointId].x, sk.pts[ref.pointId].y), dir: vsc(sk.frame.n, -1) };
+}
 
 /** The kernel build step for one feature; null if its tool is not rebuilt yet. */
 export function stepFor(features: Feature[], f: Feature): BuildStep | null {
@@ -73,6 +102,16 @@ export function stepFor(features: Feature[], f: Feature): BuildStep | null {
     const r = findProfileIn(features, P);
     if (r) { if (r.pr.key !== P.key) P.key = r.pr.key; P.hint = profileHint(r.pr); }
     return { kind: 'extrude', id: f.id, profile: r ? profileSpec(r.sk.frame!, r.pr) : null, face: null, ...range, operation: P.operation, bodyId: f.bodyId || null };
+  }
+  if (f.type === 'revolve') {
+    const P = f.params as any, r = findProfileIn(features, P);
+    if (r) { if (r.pr.key !== P.key) P.key = r.pr.key; P.hint = profileHint(r.pr); }
+    const ax = axisWorld(features, () => 'a body', P.axis), ang = Math.abs(+P.angle || 0);
+    return { kind: 'revolve', id: f.id, profile: r ? profileSpec(r.sk.frame!, r.pr) : null, axis: ax ? { A: ax.A, d: ax.d } : null, ang0: P.direction === 'Symmetric' ? -ang / 2 : (+P.angle || 0) < 0 ? -ang : 0, angle: ang, operation: P.operation, bodyId: f.bodyId || null };
+  }
+  if (f.type === 'hole') {
+    const P = f.params as any;
+    return { kind: 'hole', id: f.id, at: ((P.pts || []) as HoleRef[]).map((ref) => holeSpot(features, ref)), d: +P.d || 0, through: P.extent !== 'Distance', depth: +P.depth || 0, type: P.type || 'Simple', cbD: +P.cbD || 0, cbDepth: +P.cbDepth || 0, csD: +P.csD || 0 };
   }
   if (f.type === 'fillet') {
     const P = f.params as any;

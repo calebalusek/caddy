@@ -1,15 +1,15 @@
 // Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
 // Runs wherever the kernel is loaded: the Web Worker in the app, Node in tests.
 import {
-  assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makeThreePointArc, makeVertex, measureArea, measureDistanceBetween, measureVolume, Vector,
+  assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makePolygon, makeThreePointArc, makeVertex, revolution, measureArea, measureDistanceBetween, measureVolume, Vector,
   type Edge, type Face, type Shape3D, type Wire,
 } from 'replicad';
-import { toWorld, vdot, vnorm, vsc, vsub } from '../model/frames';
+import { toWorld, vadd, vcross, vdot, vlen, vnorm, vsc, vsub } from '../model/frames';
 import type { Frame, Vec3 } from '../model/types';
 import type { P2 } from '../sketch/model';
 import { arcDelta } from '../sketch/profiles';
 import { matchEdge } from './match';
-import type { BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, LoopSpec, ProfileSpec, StepResult } from './protocol';
+import type { BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
 
 /** Display tessellation: chord error in mm and angle step in radians. */
 export const DISPLAY_QUALITY = { tolerance: 0.02, angularTolerance: 0.2 };
@@ -42,6 +42,16 @@ function profileFace(p: ProfileSpec, z: number, sc: Scope): Face {
   const outer = sc.add(loopWire(p.frame, p.outer, z, false, sc));
   const holes = p.holes.map((h) => sc.add(loopWire(p.frame, h, z, true, sc)));
   return makeFace(outer, holes);
+}
+
+/** Points along a loop (ends, and a few along each arc), enough to tell which side of a line it is on. */
+function loopSamples(loop: LoopSpec): P2[] {
+  if ('circle' in loop) { const { c, r } = loop.circle; return [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [c[0] + r * Math.cos((i * Math.PI) / 4), c[1] + r * Math.sin((i * Math.PI) / 4)] as P2); }
+  return loop.edges.flatMap((e) => {
+    if (e.type === 'line') return [e.a];
+    const a0 = Math.atan2(e.a[1] - e.c[1], e.a[0] - e.c[0]), dl = arcDelta(e);
+    return [0, 1, 2, 3, 4, 5, 6, 7].map((i) => { const t = a0 + (dl * i) / 8; return [e.c[0] + e.r * Math.cos(t), e.c[1] + e.r * Math.sin(t)] as P2; });
+  });
 }
 
 // ---- which feature made which face ----
@@ -189,6 +199,21 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
   const body = (id: string): BodyState => { let b = bodies.find((x) => x.id === id); if (!b) { b = { id, shape: null, tags: new Map() }; bodies.push(b); } return b; };
   const results: StepResult[] = [];
   const keep = <T extends Shape3D>(s: T): T => sc.add(s);
+  /** Join the tool to a body, cut it from every body it touches, or make it a new body. Returns what went wrong, if anything. */
+  const combine = (op: Operation, bodyId: string | null, tool: Shape3D, toolTags: Map<string, string>, tbox: [Vec3, Vec3], tag: string): string | null => {
+    const fresh = (): string => tag;
+    if (op === 'Cut') {
+      const targets = bodies.filter((b) => b.shape && boxesTouch(boxOf(b.shape), tbox));
+      if (!targets.length) return 'nothing to cut';
+      targets.forEach((b) => { const out = keep(b.shape!.cut(tool)); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; });
+      return null;
+    }
+    if (!bodyId) return 'it has no body';
+    const b = body(bodyId);
+    if (op === 'Join' && b.shape) { const out = keep(b.shape.fuse(tool)); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; }
+    else { b.shape = tool; b.tags = toolTags; }
+    return null;
+  };
 
   for (const st of steps) {
     const res: StepResult = { id: st.id };
@@ -218,17 +243,74 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
           const d = f.geomType === 'PLANE' ? vdot(vnorm(tup(f.normalAt())), normal) : 0;
           toolTags.set(sig, st.id + ':' + (d > 0.999 ? 'top' : d < -0.999 ? 'bot' : 's' + side++));
         });
-        const fresh = (): string => st.id + ':x';
-        if (st.operation === 'Cut') {
+        const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x');
+        if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'revolve') {
+        if (!st.profile) { res.error = true; res.note = 'its profile is gone'; continue; }
+        if (!st.axis) { res.error = true; res.note = 'pick an axis to revolve around'; continue; }
+        const ang = Math.min(360, Math.abs(st.angle));
+        if (ang < 0.01) { res.error = true; res.note = 'the angle needs to be more than 0°'; continue; }
+        const fr = st.profile.frame, A = st.axis.A, d = vnorm(st.axis.d);
+        if (Math.abs(vdot(d, fr.n)) > 1e-5 || Math.abs(vdot(fr.n, vsub(A, fr.o))) > 1e-3) { res.error = true; res.note = "the axis has to lie in the sketch's plane"; continue; }
+        // the whole profile must sit on one side of the axis (touching it is fine)
+        const e0 = vnorm(vcross(fr.n, d));
+        let side = 0, crosses = false;
+        [st.profile.outer, ...st.profile.holes].forEach((L) => loopSamples(L).forEach((p) => {
+          const s = vdot(vsub(toWorld(fr, p[0], p[1]), A), e0);
+          if (Math.abs(s) > 1e-6) { if (side && Math.sign(s) !== side) crosses = true; side = side || Math.sign(s); }
+        }));
+        if (crosses) { res.error = true; res.note = 'the profile crosses the axis. Move the axis to one side of the shape'; continue; }
+        let face = sc.add(profileFace(st.profile, 0, sc));
+        if (Math.abs(st.ang0) > 1e-9) face = sc.add(face.clone().rotate(st.ang0, A, d));
+        const tool = keep(revolution(face, A, d, ang));
+        const tbox = boxOf(tool);
+        res.box = tbox;
+        const toolTags = new Map<string, string>();
+        let k = 0;
+        sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':r' + k++); });
+        const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x');
+        if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'hole') {
+        const R = st.d / 2;
+        if (!(R > 0)) { res.error = true; res.note = 'give the hole a diameter'; continue; }
+        if (!st.at.length) { res.error = true; res.note = 'place the hole: click a flat face or a sketch point'; continue; }
+        // "through all" drills far enough to come out of anything
+        let lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
+        bodies.forEach((b) => { if (!b.shape) return; const bx = boxOf(b.shape); lo = lo.map((v, i) => Math.min(v, bx[0][i])) as Vec3; hi = hi.map((v, i) => Math.max(v, bx[1][i])) as Vec3; });
+        const D = st.through ? (isFinite(lo[0]) ? vlen(vsub(hi, lo)) * 2 + 10 : 100) : st.depth;
+        if (!(D > 0)) { res.error = true; res.note = 'give the hole a depth, or choose Through all'; continue; }
+        // the drill's outline as (radius, depth); it starts a hair above the surface so the cut is clean
+        let prof: [number, number][];
+        if (st.type === 'Counterbore') {
+          const Rc = st.cbD / 2, h = st.cbDepth;
+          if (!(Rc > R) || !(h > 0) || h >= D) { res.error = true; res.note = 'counterbore needs a larger diameter and a depth smaller than the hole'; continue; }
+          prof = [[0, -0.05], [Rc, -0.05], [Rc, h], [R, h], [R, D], [0, D]];
+        } else if (st.type === 'Countersink') {
+          const Rs = st.csD / 2;
+          if (!(Rs > R)) { res.error = true; res.note = 'countersink needs a larger diameter than the hole'; continue; }
+          prof = [[0, -0.05], [Rs + 0.05, -0.05], [R, Rs - R], [R, D], [0, D]];
+        } else prof = [[0, -0.05], [R, -0.05], [R, D], [0, D]];
+        let gone = 0, drilled = 0;
+        st.at.forEach((spot, k) => {
+          let c: Vec3, dir: Vec3;
+          if (!spot) { gone++; return; }
+          if ('face' in spot) {
+            // on a body face: stay on that face even if it moved along its normal
+            const src = bodies.find((b) => b.id === spot.face.bodyId), f = src && src.shape ? findFace(src.shape, spot.face, src.tags, sc) : null;
+            if (!f) { gone++; return; }
+            const n = vnorm(spot.face.n), w = vdot(n, tup(f.center));
+            c = vadd(spot.face.p, vsc(n, w - spot.face.w)); dir = vsc(n, -1);
+          } else { c = spot.c; dir = vnorm(spot.dir); }
+          const e = vnorm(Math.abs(dir[0]) < 0.9 ? vcross(dir, [1, 0, 0]) : vcross(dir, [0, 1, 0]));
+          const drill = keep(revolution(sc.add(makePolygon(prof.map(([r, z]) => vadd(vadd(c, vsc(e, r)), vsc(dir, z))))), c, dir, 360));
+          const tbox = boxOf(drill);
           const targets = bodies.filter((b) => b.shape && boxesTouch(boxOf(b.shape), tbox));
-          if (!targets.length) { res.error = true; res.note = 'nothing to cut'; continue; }
-          targets.forEach((b) => { const out = keep(b.shape!.cut(tool)); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; });
-        } else {
-          if (!st.bodyId) { res.error = true; res.note = 'it has no body'; continue; }
-          const b = body(st.bodyId);
-          if (st.operation === 'Join' && b.shape) { const out = keep(b.shape.fuse(tool)); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; }
-          else { b.shape = tool; b.tags = toolTags; }
-        }
+          targets.forEach((b) => { const out = keep(b.shape!.cut(drill)); b.tags = retag(out, b.tags, null, () => st.id + ':h' + k, sc); b.shape = out; });
+          if (targets.length) drilled++;
+        });
+        if (gone === st.at.length) { res.error = true; res.note = 'its hole points are gone'; }
+        else if (gone) { res.error = true; res.note = `${gone} of its hole points are gone`; }
+        else if (!drilled) { res.error = true; res.note = 'nothing to cut'; }
       } else if (st.kind === 'fillet') {
         if (!(st.r > 0)) { res.error = true; res.note = 'its size is 0'; continue; }
         let bad = 0;
