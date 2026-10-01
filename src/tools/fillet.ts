@@ -6,13 +6,14 @@ import { state } from '../app/state';
 import { fmt } from '../core/format';
 import { edgeToRef, matchEdge, refIs } from '../kernel/match';
 import type { BodyResult, EdgeInfo, EdgeRef } from '../kernel/protocol';
-import { vdot } from '../model/frames';
+import { vadd, vcross, vdot, vnorm, vsc, vsub } from '../model/frames';
 import type { OtherFeature, Vec3 } from '../model/types';
 import { message } from '../ui/message';
 import { edgeSegments, setBoldSegments, setHoverEdge, setHoverFace } from '../view/bodies';
 import { edgeAtCursor, faceAtCursor, type FaceHit } from '../view/hit';
 import { selectedEdgeRefs } from '../view/interaction';
-import { focusPrimary, registerTool, setHint, updateChips, updatePreview, type ActiveDialog, type ToolDef } from './dialog';
+import { v3 } from '../view/planes';
+import { focusPrimary, refreshHandle, registerTool, setHint, updateChips, updatePreview, type ActiveDialog, type Handle, type ToolDef } from './dialog';
 
 interface FilletParams { kind: 'fillet' | 'chamfer'; edges: EdgeRef[]; r: number }
 type Dlg = ActiveDialog<FilletParams>;
@@ -49,6 +50,24 @@ function drawPicked(A: Dlg): void {
   setBoldSegments(segs);
 }
 
+/**
+ * The drag arrow: it sits on the first picked edge and slides across the neighboring face, so its
+ * tip marks how far the fillet or chamfer cuts into the body.
+ */
+function sizeHandle(A: Dlg): Handle | null {
+  for (const ref of A.params.edges) {
+    const b = baseBody(ref.bodyId), e = b ? matchEdge(b.edges, ref) : null;
+    if (!b || !e) continue;
+    const along = e.kind === 'round' ? vnorm(vcross(e.axis!, vsub(e.mid, e.center!))) : vnorm(vsub(e.b, e.a));
+    let t = vnorm(vcross(e.n1, along)); // in the first face, square to the edge
+    const face = b.faces.find((f) => f.id === e.faces[0]);
+    if (face ? vdot(t, vsub(face.p, e.mid)) < 0 : vdot(t, e.n2) > 0) t = vsc(t, -1); // pointing into that face
+    const r = Math.max(0, A.params.r || 0);
+    return { base: v3(e.mid), tip: v3(vadd(e.mid, vsc(t, r))), axis: v3(t), dir: 1, value: r };
+  }
+  return null;
+}
+
 function make(kind: 'fillet' | 'chamfer'): ToolDef<FilletParams> {
   const word = kind === 'chamfer' ? 'Chamfer' : 'Fillet';
   return {
@@ -61,12 +80,15 @@ function make(kind: 'fillet' | 'chamfer'): ToolDef<FilletParams> {
       { key: 'edges', kind: 'chip', label: 'Edges', chipId: 'edgeChip', note: 'Click an edge again to remove it. Click a face to take all its edges.' },
       { key: 'r', kind: 'length', label: kind === 'chamfer' ? 'Distance' : 'Radius', primary: true },
     ],
+    distanceKey: 'r',
+    minDistance: 0,
     defaults: () => ({ kind, edges: selectedEdgeRefs(), r: 0 }),
     chips: (A) => { const n = A.params.edges.length; return { edgeChip: { set: n > 0, text: n ? `${n} edge${n > 1 ? 's' : ''} selected` : 'Click the edges to ' + (kind === 'chamfer' ? 'bevel' : 'round') } }; },
     draftStep: (A) => (A.params.edges.length && A.params.r > 0 ? { kind: 'fillet', id: A.edit ? A.edit.id : 'draft', mode: kind, r: A.params.r, edges: A.params.edges } : null),
-    preview: (A: Dlg) => { drawPicked(A); return { ok: A.params.edges.length > 0 && A.params.r > 0 }; },
+    preview: (A: Dlg) => { drawPicked(A); return { handle: sizeHandle(A), ok: A.params.edges.length > 0 && A.params.r > 0 }; },
     onBuilt: (A: Dlg) => {
       drawPicked(A);
+      refreshHandle();
       setHint('h-r', A.note ? A.note[0].toUpperCase() + A.note.slice(1) : '');
     },
     hover: (A: Dlg) => {

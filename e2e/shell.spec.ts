@@ -134,6 +134,18 @@ test.describe('offset plane (first tool on the shared tool-menu system)', () => 
     expect(s.features[0].frame.o).toEqual([0, 0, 30]);
     expect(s.features[1].frame.o).toEqual([0, 0, 35]);
 
+    // Ctrl+Z steps back one step: first back into the tool with its value, then the plane itself goes
+    // the last step was the edit of Plane1 (10 → 30): its menu comes back showing 30, then the edit is undone
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#dlgTitle')).toHaveText('Edit Plane1');
+    await expect(page.locator('#f-distance')).toHaveValue('30');
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#msg')).toHaveText('Undid Plane1');
+    expect((await state(page)).features.map((f: any) => f.frame.o)).toEqual([[0, 0, 10], [0, 0, 15]]);
+    // the step before that was creating Plane2
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#dlgTitle')).toHaveText('Edit Plane2');
+    await expect(page.locator('#f-distance')).toHaveValue('5');
     await page.keyboard.press('Control+z');
     await expect(page.locator('#msg')).toHaveText('Undid Plane2');
     expect((await state(page)).features).toHaveLength(1);
@@ -145,7 +157,7 @@ test.describe('offset plane (first tool on the shared tool-menu system)', () => 
     await page.keyboard.press('Enter');
     await page.locator('#timeline [data-ref="plane:p1"]').click({ button: 'right' });
     await page.locator('#ctx button', { hasText: 'Delete' }).click();
-    await expect(page.locator('#msg')).toContainText('Deleted Plane1 and what was built on it: Plane3');
+    await expect(page.locator('#msg')).toContainText('Deleted Plane1 and what was built on it: Plane2'); // the undone Plane2's name is free again
     expect((await state(page)).features).toHaveLength(0);
   });
 

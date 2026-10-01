@@ -8,6 +8,7 @@ import { icon } from '../core/icons';
 import { emit, on } from '../app/hub';
 import { regenerate } from '../app/regenerate';
 import { rebuildSolids } from '../app/solids';
+import { pushUndo, snapshotDoc } from '../app/undo';
 import { state } from '../app/state';
 import type { BuildStep } from '../kernel/protocol';
 import type { Feature } from '../model/types';
@@ -51,6 +52,8 @@ export interface ToolDef<P = any> {
   advanced?: FieldDef<P>[];
   /** Parameter the drag arrow changes. */
   distanceKey?: string;
+  /** The drag arrow never goes below this (sizes cannot be negative). */
+  minDistance?: number;
   defaults: () => P;
   onOpen?: (A: ActiveDialog<P>) => void;
   chips?: (A: ActiveDialog<P>) => Record<string, ChipState>;
@@ -80,6 +83,8 @@ export interface ActiveDialog<P = any> {
   params: P;
   edit: Feature | null;
   note?: string;
+  /** Reopened by Ctrl+Z: the timeline as it was before this feature's last change. Ctrl+Z again goes back to it. */
+  undoBefore?: string;
 }
 
 const TOOLS: Record<string, ToolDef> = {};
@@ -276,14 +281,32 @@ function closeDialog(): void {
 export function cancelDialog(silent?: boolean): void {
   const A = state.active;
   if (!A) return;
+  // a menu that Ctrl+Z reopened and the user closed: the step can still be undone later
+  if (A.undoBefore && A.edit) pushUndo({ kind: 'feature', id: A.edit.id, before: A.undoBefore });
   closeDialog();
   if (!silent) message(`${A.def.title} canceled`);
+}
+
+/** Move the drag arrow to where the tool says it is now, without starting another rebuild. */
+export function refreshHandle(): void {
+  const A = state.active;
+  if (!A) return;
+  const h = A.def.preview(A).handle;
+  if (!h) { arrow.visible = false; dimEl.style.display = 'none'; return; }
+  arrow.visible = true;
+  arrow.position.copy(h.tip);
+  arrow.quaternion.setFromUnitVectors(ZAX, h.axis);
+  arrow.userData.dir = h.dir;
+  handleAxis.copy(h.base); handleDir.copy(h.axis);
+  dimEl.style.display = 'block';
+  dimEl.textContent = fmt(h.value) + ' mm';
 }
 
 export function setDistance(v: number): void {
   const A = state.active;
   if (!A || !A.def.distanceKey) return;
   const key = A.def.distanceKey;
+  if (A.def.minDistance != null) v = Math.max(A.def.minDistance, v);
   A.params[key] = v;
   const inp = dialogEl.querySelector<HTMLInputElement>('#f-' + key);
   if (inp) {
@@ -300,7 +323,12 @@ export function commitDialog(): void {
   const A = state.active;
   if (!A) return;
   if (dialogEl.querySelector('.len-input.invalid')) { message('Fix the highlighted value first', 'warn'); return; }
-  if (A.def.commit(A, cloneParams(A.params))) closeDialog();
+  const before = A.undoBefore || snapshotDoc();
+  if (!A.def.commit(A, cloneParams(A.params))) return;
+  const f = A.edit || state.features[state.features.length - 1];
+  if (f) pushUndo({ kind: 'feature', id: f.id, before });
+  A.undoBefore = undefined;
+  closeDialog();
 }
 
 /** Esc while a tool menu is open. */

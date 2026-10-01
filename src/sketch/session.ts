@@ -7,6 +7,7 @@ import { icon } from '../core/icons';
 import { emit, on } from '../app/hub';
 import { markDirty, regenerate } from '../app/regenerate';
 import { feats, state } from '../app/state';
+import { pushUndo } from '../app/undo';
 import type { PlaneRef, SketchFeature } from '../model/types';
 import { cancelDialog } from '../tools/dialog';
 import { endPick, planeName, selectedPlaneRef, setPointer, startPick } from '../tools/pick';
@@ -82,6 +83,7 @@ export function finishSketch(quiet?: boolean): void {
   regenerate();
   emit('mode', 'select');
   const n = sk.profiles ? sk.profiles.length : 0;
+  if (!quiet) pushUndo({ kind: 'sketch', id: sk.id });
   if (!quiet) message(`Finished ${sk.name}: ${n === 1 ? '1 profile' : n + ' profiles'}, ${dofText(sk)}. Type ex to extrude.`, 'ok');
 }
 

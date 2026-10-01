@@ -1,10 +1,11 @@
 // Changing the timeline: delete, undo, show/hide, new project.
 import type { Body, Feature } from '../model/types';
 import { newCounters } from '../model/types';
-import { closeDimEdit, finishSketch, rebuildOverlay } from '../sketch/session';
-import { clearTracking, exitTool, sketchUndo } from '../sketch/tools';
+import { closeDimEdit, enterSketch, finishSketch, isDimEditing, rebuildOverlay } from '../sketch/session';
+import { clearTracking, exitTool, sketchUndo, toolBusy } from '../sketch/tools';
 import { clearHoverLines, drawSketchSelection, setSketchOnTop } from '../sketch/visuals';
-import { cancelDialog } from '../tools/dialog';
+import { cancelDialog, hasTool, openDialog } from '../tools/dialog';
+import { clearUndo, popUndo, pushUndo, restoreDoc, snapshotDoc } from './undo';
 import { cancelPick, endPick } from '../tools/pick';
 import { message } from '../ui/message';
 import { applyGridVisibility } from '../view/scene';
@@ -56,24 +57,50 @@ function removeFeatures(list: Feature[]): void {
 }
 
 export function deleteFeature(f: Feature): void {
+  pushUndo({ kind: 'doc', before: snapshotDoc(), label: `Brought back ${f.name}` });
   const list = collectWithDependents([f]), extra = list.slice(1).map((x) => x.name);
   removeFeatures(list);
   message(`Deleted ${f.name}${extra.length ? ' and what was built on it: ' + extra.join(', ') : ''}`, extra.length ? 'warn' : undefined);
 }
 
 export function deleteBody(b: Body): void {
+  pushUndo({ kind: 'doc', before: snapshotDoc(), label: `Brought back ${b.name}` });
   removeFeatures(collectWithDependents(state.features.filter((f) => bodyIdsOf(f)[0] === b.id)));
   message(`Deleted ${b.name}`);
 }
 
 export function undo(): void {
   if (state.pick && !state.active) { cancelPick(); return; }
-  if (state.active) { cancelDialog(); return; }
-  if (state.mode === 'sketch' && state.sketch) { sketchUndo(); return; }
-  const f = state.features[state.features.length - 1];
-  if (!f) { message('Nothing to undo'); return; }
-  removeFeatures([f]);
-  message(`Undid ${f.name}`);
+  const A = state.active;
+  if (A) {
+    // a menu that Ctrl+Z reopened: Ctrl+Z again takes the step itself back
+    if (A.undoBefore) {
+      const before = A.undoBefore, name = A.edit ? A.edit.name : A.def.title;
+      A.undoBefore = undefined;
+      cancelDialog(true);
+      restoreDoc(before);
+      message(`Undid ${name}`);
+    } else cancelDialog();
+    return;
+  }
+  if (state.mode === 'sketch' && state.sketch) {
+    const sk = state.sketch;
+    // an empty sketch with nothing left to undo: step back out of it
+    if (!sk.hist.length && !sk.curves.length && !toolBusy() && !isDimEditing()) { removeFeatures([sk]); message(`Removed ${sk.name}`); return; }
+    sketchUndo();
+    return;
+  }
+  const e = popUndo();
+  if (!e) { message('Nothing to undo'); return; }
+  if (e.kind === 'doc') { restoreDoc(e.before); message(e.label); return; }
+  const f = featById(e.id)!;
+  if (e.kind === 'sketch' && f.type === 'sketch') { enterSketch(f); message(`Back in ${f.name}. Ctrl+Z undoes drawing steps; fs finishes.`); return; }
+  if (e.kind !== 'feature') return;
+  const tool = f.type === 'fillet' ? String((f.params as { kind?: string }).kind || 'fillet') : f.type;
+  if (!hasTool(tool)) { restoreDoc(e.before); message(`Undid ${f.name}`); return; }
+  openDialog(tool, f);
+  if (state.active) state.active.undoBefore = e.before;
+  message(`Back in ${f.name}: change it and press Enter, or press Ctrl+Z again to take it out.`);
 }
 
 /** ref is "origin", "body:<id>" or "<type>:<id>". */
@@ -93,6 +120,7 @@ export function resetScene(): void {
   if (state.sketch) dropSketchSession();
   clearTracking();
   clearHoverLines();
+  clearUndo();
   state.mode = 'solid';
   state.features = [];
   state.bodies = [];

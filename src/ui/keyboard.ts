@@ -21,7 +21,9 @@ export function initKeyboard(): void {
       const k = e.key.toLowerCase();
       if (k === 's') { e.preventDefault(); runCommand('save'); return; }
       if (k === 'o') { e.preventDefault(); runCommand('openfile'); return; }
-      if (k === 'z') { if (!inField || (isCommandInput(t) && commandInputEmpty()) || t.closest('.hud')) { e.preventDefault(); undo(); } return; }
+      // in a tool menu that Ctrl+Z reopened, Ctrl+Z again steps back out of it (elsewhere in a text box it undoes typing)
+      const reopened = !!state.active && !!state.active.undoBefore && !!t.closest('section.dialog');
+      if (k === 'z') { if (!inField || reopened || (isCommandInput(t) && commandInputEmpty()) || t.closest('.hud')) { e.preventDefault(); undo(); } return; }
     }
     if (isLibraryOpen()) return; // the library screen handles its own keys
     if (inField || e.ctrlKey || e.metaKey || e.altKey) return;

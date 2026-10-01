@@ -2,6 +2,7 @@
 // click selection (bold blue) and handing clicks to whichever tool is asking for something.
 import { runCommand } from '../app/commands';
 import { emit, on } from '../app/hub';
+import { pushUndo, snapshotDoc } from '../app/undo';
 import { baseBody, rebuildSolids, shownBodies } from '../app/solids';
 import { feats, featById, state, type Selection } from '../app/state';
 import { edgeToRef, refIs } from '../kernel/match';
@@ -216,6 +217,7 @@ export function deleteSelectedFaces(): boolean {
     message(src ? `That face comes from ${src.name}. To change it, edit ${src.name} (double-click it in the History) or delete it there.` : "That face can't be deleted on its own", 'warn');
     return true;
   }
+  pushUndo({ kind: 'doc', before: snapshotDoc(), label: 'Brought the fillet back' });
   const done: string[] = [];
   byF.forEach((idx, fid) => {
     const f = featById(fid)!, P = f.params as { edges: EdgeRef[] }, keep = P.edges.filter((_e, i) => !idx.has(i));

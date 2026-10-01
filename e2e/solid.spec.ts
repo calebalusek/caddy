@@ -185,9 +185,13 @@ test.describe('extrude', () => {
     expect(r.bodies[0].volume).toBeCloseTo(40 * 30 * 25, 6);
     expect(r.docBodies).toEqual(['Body1']); // joined, not a second body
 
-    await page.keyboard.press('Control+z');
+    await page.keyboard.press('Control+z'); // back into the tool
+    await expect(page.locator('#dlgTitle')).toHaveText('Edit Extrude2');
+    await page.keyboard.press('Control+z'); // and out of it: the press-pull is gone
+    await expect(dialog(page)).toBeHidden();
     r = await built(page);
     expect(r.bodies[0].volume).toBeCloseTo(24000, 6);
+    expect(r.features).toHaveLength(2);
   });
 
   test('pick the profile from the Browser while Extrude is open (standing rule 2)', async ({ page }) => {
@@ -300,6 +304,103 @@ test.describe('fillet and chamfer', () => {
     r = await built(page);
     expect(r.bodies[0].volume).toBeCloseTo(55 * 30 * 20, 6);
     expect(r.features).toHaveLength(2);
+  });
+
+  test('the size arrow slides along the face to show how far the fillet cuts in; dragging it sets the radius', async ({ page }) => {
+    await openApp(page);
+    await box(page);
+    const e = await screenOf(page, [40, 15, 20]);
+    await page.mouse.click(e.x, e.y);
+    await typeCommand(page, 'f');
+    await page.keyboard.type('5');
+    await built(page);
+    await expect(page.locator('#dim')).toHaveText('5 mm');
+    // the arrow lies in one of the two faces at the edge, pointing away from the edge
+    const inTop = await page.evaluate(() => {
+      const ed = (window as any).__caddy.baseBodies()[0].edges.find((x: any) => Math.abs(x.mid[0] - 40) < 1e-6 && Math.abs(x.mid[2] - 20) < 1e-6 && Math.abs(x.mid[1] - 15) < 1e-6);
+      return Math.abs(ed.n1[2] - 1) < 1e-6;
+    });
+    const along = (d: number): [number, number, number] => (inTop ? [40 - d, 15, 20] : [40, 15, 20 - d]);
+    const grab = await screenOf(page, along(5 + 8)), to = await screenOf(page, along(5 + 8 + 6));
+    await page.mouse.move(grab.x, grab.y);
+    await page.mouse.down();
+    await page.mouse.move((grab.x + to.x) / 2, (grab.y + to.y) / 2, { steps: 3 });
+    await page.mouse.move(to.x, to.y, { steps: 3 });
+    await page.mouse.up();
+    const v = Number(await page.locator('#f-r').inputValue());
+    expect(v).toBeGreaterThan(8); expect(v).toBeLessThan(14);
+    expect(Number.isInteger(v)).toBe(true);
+    await expect(page.locator('#dim')).toHaveText(`${v} mm`);
+    const r = await built(page);
+    expect(24000 - r.bodies[0].volume).toBeCloseTo((1 - Math.PI / 4) * v * v * 30, 5); // the body follows the arrow
+    // dragging back past the edge stops at 0, never negative
+    const tip = await screenOf(page, along(v + 8)), past = await screenOf(page, along(-30));
+    await page.mouse.move(tip.x, tip.y);
+    await page.mouse.down();
+    await page.mouse.move(past.x, past.y, { steps: 6 });
+    await page.mouse.up();
+    await expect(page.locator('#f-r')).toHaveValue('0');
+  });
+
+  test('Ctrl+Z steps back one step: reopens the fillet with its radius, then removes it; deletes come back; a finished sketch reopens', async ({ page }) => {
+    await openApp(page);
+    await box(page);
+    const e = await screenOf(page, [40, 15, 20]);
+    await page.mouse.click(e.x, e.y);
+    await typeCommand(page, 'f');
+    await page.keyboard.type('5');
+    await page.keyboard.press('Enter');
+    await built(page);
+
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#dlgTitle')).toHaveText('Edit Fillet1');
+    await expect(page.locator('#f-r')).toHaveValue('5'); // the number is still there, ready to change
+    await expect(page.locator('#f-r')).toBeFocused();
+    await page.keyboard.type('3');
+    await page.keyboard.press('Enter');
+    let r = await built(page);
+    expect(24000 - r.bodies[0].volume).toBeCloseTo((1 - Math.PI / 4) * 9 * 30, 6);
+    expect(r.features).toHaveLength(3);
+
+    await page.keyboard.press('Control+z'); // back in again, now showing 3
+    await expect(page.locator('#f-r')).toHaveValue('3');
+    await page.keyboard.press('Escape'); // changed my mind: the fillet stays as it is
+    r = await built(page);
+    expect(r.features).toHaveLength(3);
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#dlgTitle')).toHaveText('Edit Fillet1');
+    await page.keyboard.press('Control+z'); // a second Ctrl+Z takes the fillet out
+    await expect(page.locator('#msg')).toHaveText('Undid Fillet1');
+    r = await built(page);
+    expect(r.features.map((f: any) => f.name)).toEqual(['Sketch1', 'Extrude1']);
+    expect(r.bodies[0].volume).toBeCloseTo(24000, 6);
+
+    // a delete comes back
+    await page.locator('#timeline [data-ref="extrude:e1"]').click({ button: 'right' });
+    await page.locator('#ctx button', { hasText: 'Delete' }).click();
+    expect((await built(page)).bodies).toHaveLength(0);
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#msg')).toHaveText('Brought back Extrude1');
+    r = await built(page);
+    expect(r.bodies[0].volume).toBeCloseTo(24000, 6);
+    expect(r.docBodies).toEqual(['Body1']);
+  });
+
+  test('Ctrl+Z after finishing a sketch goes back into it; inside, it undoes one drawing step at a time', async ({ page }) => {
+    await openApp(page);
+    await sketchRect(page, 40, 30);
+    await expect(page.locator('#prompt')).toHaveText('Command');
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#prompt')).toHaveText('Sketch1');
+    await expect(page.locator('#msg')).toContainText('Back in Sketch1');
+    await page.keyboard.press('Control+z'); // the rectangle
+    await expect(page.locator('#msg')).toHaveText('Undone');
+    expect(await page.evaluate(() => (window as any).__caddy.state.sketch.curves.length)).toBe(0);
+    await page.keyboard.press('Control+z'); // nothing left in it: step back out, the empty sketch goes
+    await expect(page.locator('#msg')).toHaveText('Removed Sketch1');
+    expect(await page.evaluate(() => (window as any).__caddy.state.features.length)).toBe(0);
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('#msg')).toHaveText('Nothing to undo');
   });
 
   test('new project leaves no body, selection or highlight behind', async ({ page }) => {

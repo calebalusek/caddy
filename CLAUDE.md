@@ -31,7 +31,8 @@ parts for **3D printing**. Built for the owner and other people to use.
     it. Extrude (regions, press-pull, auto Join/Cut/New body) and Fillet/Chamfer (live preview).
   - **Step 4 done**: files (`src/files/`): autosave + project library (IndexedDB), `.caddy.json`
     version 2 (opens version 1), Save window with real Save As, STL / 3MF / STEP export with a
-    smoothness setting. **Checkpoint 1 reached (core loop); waiting for the owner's review.**
+    smoothness setting. Checkpoint 1 reviewed by the owner 2026-10-01: STL printed-path check in a
+    slicer was good; asked for the fillet arrow and step-back Ctrl+Z (both done), then step 5.
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised
@@ -106,6 +107,13 @@ parts for **3D printing**. Built for the owner and other people to use.
 8. **Look professional**: modern, theme-matched UI; orange scroll thumb in tool menus; slim
    theme-matched scrollbars elsewhere; clear, short status messages; no dead buttons without an
    explanation.
+10. **Ctrl+Z steps back one step; it never throws a whole feature away in one go.** Right after a
+    tool (extrude, fillet, plane…) it reopens that tool's menu with its values still in it, ready
+    to change; Ctrl+Z again there takes the feature out. Right after finishing a sketch it goes
+    back into the sketch, where it undoes one drawing step at a time. Deletes come back. Only the
+    last few steps are remembered, for the current session only (`src/app/undo.ts`).
+11. **Tools with a size get a drag arrow** in the viewport with a live value label, like Extrude
+    (Fillet/Chamfer: the arrow slides across the face to show how far the cut goes in).
 9. **Safety with printers**: no G-code / slicer features yet (parked). If ever built, use proven
    engines, conservative per-printer profiles and a mandatory preview.
 

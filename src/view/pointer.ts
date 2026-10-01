@@ -10,7 +10,7 @@ import { stopAnimation } from './views';
 
 type Ptr =
   | { mode: 'orbit' | 'pan'; x: number; y: number; moved: boolean; button: number }
-  | { mode: 'handle'; drag: HandleDrag }
+  | { mode: 'handle'; drag: HandleDrag; x: number; y: number; moved: boolean; button: number }
   | { mode: 'skdrag'; drag: SketchDrag };
 
 export function initPointer(): void {
@@ -21,7 +21,7 @@ export function initPointer(): void {
     stopAnimation();
     setPointer(e);
     const drag = handleDragStart(e);
-    if (drag) { ptr = { mode: 'handle', drag }; canvas.style.cursor = 'grabbing'; return; }
+    if (drag) { ptr = { mode: 'handle', drag, x: e.clientX, y: e.clientY, moved: false, button: e.button }; canvas.style.cursor = 'grabbing'; return; }
     // with no sketch tool active, pressing on a point, line or circle drags it
     if (state.mode === 'sketch' && !state.pick) {
       const sd = sketchDragStart(e);
@@ -37,7 +37,13 @@ export function initPointer(): void {
       return;
     }
     if (ptr.mode === 'skdrag') { sketchDragMove(e, ptr.drag); return; }
-    if (ptr.mode === 'handle') { handleDragMove(e, ptr.drag, cam.r); return; }
+    if (ptr.mode === 'handle') {
+      // a press on the arrow that does not move is a click on whatever is under it (the arrow can sit on an edge)
+      if (!ptr.moved && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) < 4) return;
+      ptr.moved = true;
+      handleDragMove(e, ptr.drag, cam.r);
+      return;
+    }
     const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
     if (!ptr.moved && Math.hypot(dx, dy) < 4) return;
     ptr.moved = true; ptr.x = e.clientX; ptr.y = e.clientY;
@@ -56,7 +62,7 @@ export function initPointer(): void {
     const was = ptr;
     ptr = null;
     canvas.style.cursor = '';
-    if (was.mode === 'handle') { focusPrimary(); return; }
+    if (was.mode === 'handle' && was.moved) { focusPrimary(); return; }
     if (was.mode === 'skdrag') { sketchDragEnd(was.drag); return; }
     if (was.moved) return;
     setPointer(e);
