@@ -114,5 +114,14 @@ await page.evaluate(() => {
 });
 await save('sweep-round-l');
 
+// ---- 4. an open box: 40 × 30 × 20, top open, 2 mm walls inside ----
+await page.evaluate(() => window.__caddy.newProject());
+await page.waitForTimeout(300);
+await sketchOn({ kind: 'origin', id: 'XY' }, [{ rect: [0, 0, 40, 30] }]);
+await page.evaluate(() => { const c = window.__caddy, sk = c.state.features[0]; c.state.selected = { sketchId: sk.id, key: sk.profiles[0].key }; });
+await feature('extrude', { distance: 20 });
+await feature('shell', { bodyId: 'b1', faces: [{ surf: 'e1:top', n: [0, 0, 1], w: 20, p: [20, 15, 20], curved: false }], thickness: 2, direction: 'Inside' });
+await save('shell-open-box');
+
 await browser.close();
 void cmd; void at;

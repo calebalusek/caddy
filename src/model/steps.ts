@@ -64,7 +64,7 @@ export function findProfileIn(features: Feature[], sel: ProfileParams | null | u
 }
 
 /** Which rebuild step brings back a feature type that is not rebuilt yet. */
-export const LATER: Record<string, number> = { shell: 7, pattern: 7 };
+export const LATER: Record<string, number> = { pattern: 7 };
 
 /** How a revolve's axis is saved (same as version 1 files). */
 export type AxisRef = { kind: 'origin'; id: 'X' | 'Y' | 'Z' } | { kind: 'line'; sketchId: string; lineId: string } | { kind: 'edge'; bodyId: string; a: Vec3; b: Vec3 };
@@ -119,6 +119,10 @@ export function stepFor(features: Feature[], f: Feature): BuildStep | null {
     }
     const path = sweepPath(features, P.path);
     return { kind: 'sweep', id: f.id, profile, face: P.face || null, path: path.path || null, pathNote: path.err, orientation: P.orientation === 'Parallel' ? 'Parallel' : 'Perpendicular', corners: P.corners === 'Mitered' ? 'Mitered' : 'Round', operation: P.operation, bodyId: f.bodyId || null };
+  }
+  if (f.type === 'shell') {
+    const P = f.params as any, bodyId = (P.bodyId || f.bodyId || null) as string | null;
+    return { kind: 'shell', id: f.id, bodyId, faces: ((P.faces || []) as any[]).map((s) => ({ bodyId: bodyId || '', surf: s.surf, n: s.n, w: s.w, p: s.p })), thickness: +P.thickness || 0, direction: P.direction === 'Outside' ? 'Outside' : 'Inside' };
   }
   if (f.type === 'hole') {
     const P = f.params as any;

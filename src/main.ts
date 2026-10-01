@@ -25,6 +25,7 @@ import './tools/fillet';
 import './tools/revolve';
 import './tools/hole';
 import './tools/sweep';
+import './tools/shell';
 import { initChrome } from './ui/chrome';
 import { initCommandBar } from './ui/cmdbar';
 import { initKeyboard } from './ui/keyboard';

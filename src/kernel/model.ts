@@ -1,7 +1,7 @@
 // Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
 // Runs wherever the kernel is loaded: the Web Worker in the app, Node in tests.
 import {
-  assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makePolygon, makeThreePointArc, makeVertex, revolution, measureArea, measureDistanceBetween, measureVolume, Vector,
+  makeOffset, assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makePolygon, makeThreePointArc, makeVertex, revolution, measureArea, measureDistanceBetween, measureVolume, Vector,
   type Edge, type Face, type Shape3D, type Wire,
 } from 'replicad';
 import { toWorld, vadd, vcross, vdot, vlen, vnorm, vsc, vsub } from '../model/frames';
@@ -9,8 +9,9 @@ import type { Frame, Vec3 } from '../model/types';
 import type { P2 } from '../sketch/model';
 import { arcDelta } from '../sketch/profiles';
 import { matchEdge } from './match';
-import type { BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
+import type { BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, FaceSpec, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
 import { Scope, tup } from './scope';
+import { thickSolid } from './shell';
 import { rawBoolean, sweepSolid, unifyKeeping, type Disk } from './sweep';
 
 /** Display tessellation: chord error in mm and angle step in radians. */
@@ -187,6 +188,21 @@ function findFace(shape: Shape3D, spec: { n: Vec3; w: number; p: Vec3; surf?: st
   return best;
 }
 
+/** Any body face (flat or curved) a saved face reference points at. */
+function matchFace(shape: Shape3D, spec: FaceSpec, tags: Map<string, string>, sc: Scope): Face | null {
+  let best: Face | null = null, bd = Infinity;
+  const pt = sc.add(makeVertex(spec.p)), n = vnorm(spec.n);
+  sc.all(shape.faces).forEach((f) => {
+    const d = measureDistanceBetween(pt, f);
+    if (d > 0.5) return;
+    const fn = vnorm(tup(f.geomType === 'PLANE' ? f.normalAt() : f.normalAt(spec.p)));
+    if (vdot(fn, n) < 0.99) return;
+    const score = d + (spec.surf && tags.get(signature(f)) === spec.surf ? 0 : 0.25);
+    if (score < bd) { bd = score; best = f; }
+  });
+  return best;
+}
+
 /** Run the timeline's solid features in order. Everything created is tracked in sc and freed by the caller. */
 function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results: StepResult[] } {
   const bodies: BodyState[] = [];
@@ -286,6 +302,28 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
         sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':w' + k++); });
         const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x', r.keeps);
         if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'shell') {
+        const b = st.bodyId ? bodies.find((x) => x.id === st.bodyId) : null;
+        if (!b || !b.shape) { res.error = true; res.note = 'its body is gone'; continue; }
+        if (!(st.thickness > 0)) { res.error = true; res.note = 'the thickness needs to be more than 0 mm'; continue; }
+        const open: Face[] = [];
+        let gone = 0;
+        st.faces.forEach((spec) => { const f = matchFace(b.shape!, spec, b.tags, sc); if (f) open.push(f); else gone++; });
+        if (gone) { res.error = true; res.note = gone === st.faces.length ? 'its faces are gone' : `${gone} of its faces are gone`; continue; }
+        const v0 = measureVolume(b.shape), t = st.thickness, out = st.direction === 'Outside';
+        const tooBig = 'that thickness is too big for this body';
+        let result: Shape3D;
+        try {
+          if (open.length) result = keep(thickSolid(b.shape, open, out ? -t : t));
+          else if (out) { const big = keep(makeOffset(b.shape as any, t)); result = keep(big.cut(b.shape)); }
+          else { const inner = keep(makeOffset(b.shape as any, -t)); result = keep(b.shape.cut(inner)); }
+        } catch { res.error = true; res.note = tooBig; continue; }
+        const vr = measureVolume(result);
+        if (!(vr > 1e-9) || (!out && vr >= v0 - 1e-9)) { res.error = true; res.note = tooBig; continue; }
+        let k = 0;
+        b.tags = retag(result, b.tags, null, () => st.id + ':i' + k++, sc);
+        b.shape = result;
+        b.keeps = [];
       } else if (st.kind === 'hole') {
         const R = st.d / 2;
         if (!(R > 0)) { res.error = true; res.note = 'give the hole a diameter'; continue; }

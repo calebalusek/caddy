@@ -63,6 +63,15 @@ export type BuildStep =
       csD: number;
     }
   | {
+      kind: 'shell';
+      id: string;
+      bodyId: string | null;
+      /** Faces left open (any kind of face). None = a closed hollow. */
+      faces: FaceSpec[];
+      thickness: number;
+      direction: 'Inside' | 'Outside';
+    }
+  | {
       kind: 'sweep';
       id: string;
       profile: ProfileSpec | null;

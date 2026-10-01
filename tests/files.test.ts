@@ -67,6 +67,14 @@ describe('project files', () => {
     expect(r.bodies[0].volume).toBeCloseTo(100 * (2 * (50 - rho) + (Math.PI / 2) * rho), 5);
   });
 
+  it('opens a version 1 file with a Shell: open box, 2 mm walls, exact volume', () => {
+    const { features, steps } = open(v1('shell-open-box'));
+    expect(features.map((f) => f.type)).toEqual(['sketch', 'extrude', 'shell']);
+    const r = buildModel(steps);
+    expect(r.steps.filter((s) => s.error)).toEqual([]);
+    expect(r.bodies[0].volume).toBeCloseTo(7152, 5);
+  });
+
   it('round-trips: save as version 2, open again, identical model', () => {
     const first = open(v1('plate-pocket-fillet'));
     first.features.filter((f) => f.type === 'sketch').forEach((s, i) => { if (s.type === 'sketch') s.hist = ['snapshot-' + i]; });

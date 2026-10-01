@@ -75,7 +75,7 @@ export const COMMANDS: Command[] = [
   C('thread', 'Thread', 'TH', 'solid', 'create', 'thread', ['thread', 'screw', 'bolt', 'nut']),
   C('fillet', 'Fillet', 'F', 'solid', 'modify', 'fillet', ['fillet', 'round', 'radius', 'round edge'], () => openDialog('fillet')),
   C('chamfer', 'Chamfer', 'CHA', 'solid', 'modify', 'chamfer', ['chamfer', 'bevel', 'break edge'], () => openDialog('chamfer')),
-  C('shell', 'Shell', 'SH', 'solid', 'modify', 'shell', ['shell', 'hollow'], 7),
+  C('shell', 'Shell', 'SH', 'solid', 'modify', 'shell', ['shell', 'hollow'], () => openDialog('shell')),
   C('patrect', 'Rectangular pattern', 'PTR', 'solid', 'modify', 'pattern', ['pattern', 'array', 'grid'], 7),
   C('patcirc', 'Circular pattern', 'PTC', 'solid', 'modify', 'pattern', ['pattern', 'polar array', 'circular', 'bolt circle'], 7),
   C('mirror', 'Mirror', 'MI', 'solid', 'modify', 'mirror', ['mirror', 'flip', 'symmetry']),
