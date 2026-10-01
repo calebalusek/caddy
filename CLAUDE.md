@@ -29,6 +29,9 @@ parts for **3D printing**. Built for the owner and other people to use.
   - **Step 3 done**: bodies on the real kernel. `src/kernel/model.ts` builds every body from the
     timeline (exact B-rep), `src/app/solids.ts` runs it in the worker, `src/view/bodies.ts` shows
     it. Extrude (regions, press-pull, auto Join/Cut/New body) and Fillet/Chamfer (live preview).
+  - **Step 4 done**: files (`src/files/`): autosave + project library (IndexedDB), `.caddy.json`
+    version 2 (opens version 1), Save window with real Save As, STL / 3MF / STEP export with a
+    smoothness setting. **Checkpoint 1 reached (core loop); waiting for the owner's review.**
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised
@@ -45,9 +48,16 @@ parts for **3D printing**. Built for the owner and other people to use.
   (`Scope` in model.ts); face/edge ids change on every rebuild, so saved features point at edges
   geometrically (`src/kernel/match.ts`, same format as version 1 files).
 - Editing a feature rolls the timeline back to just before it while its menu is open.
+- Old files: `tests/fixtures/make-v1.mjs` drives the prototype to write real version 1 files into
+  `tests/fixtures/v1/`. Add one per feature type as each tool is rebuilt.
+- Publishing note: the OpenCascade build (`replicad-opencascadejs`) is LGPL-2.1; the published
+  site needs its license notice. replicad itself is MIT.
 - Deliberate differences from the prototype: hovering a plane is orange (rule 1; the prototype used
   blue), the toolbar button stays lit only while its tool is open, the Origin group opens by itself
-  while a tool asks for a plane, the geometry engine loads in the background.
+  while a tool asks for a plane, the geometry engine loads in the background, a STEP export
+  button and a "Smoothness of curved faces" choice (Draft / Standard / Fine) in the export window,
+  sketch undo history (last 30 steps) is saved with the project, a selected whole sketch gets
+  the bold blue band.
 
 ## Commands
 - `npm run dev` — run the app at http://localhost:5173

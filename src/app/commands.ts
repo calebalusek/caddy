@@ -3,7 +3,9 @@
 // `step` says which rebuild step brings it back; neither = a placeholder the prototype never had.
 import { $ } from '../core/dom';
 import { emit } from './hub';
-import { newProject, toggleVis, undo } from './history';
+import { toggleVis, undo } from './history';
+import { newProject, noteDocChanged, openFilePicker, showLibrary } from '../files/project';
+import { openSaveWindow } from '../ui/savewindow';
 import { saveUsage, state } from './state';
 import { finishSketch, lookAtSketch, startSketchPick } from '../sketch/session';
 import { setTool } from '../sketch/tools';
@@ -46,7 +48,7 @@ export function startDocRename(): void {
     if (done) return;
     done = true;
     const v = inp.value.trim();
-    if (save && v && v !== state.doc.name) { state.doc.name = v.slice(0, 60); state.doc.renamed = true; message(`Project renamed to ${state.doc.name}`, 'ok'); }
+    if (save && v && v !== state.doc.name) { state.doc.name = v.slice(0, 60); state.doc.renamed = true; noteDocChanged(); message(`Project renamed to ${state.doc.name}`, 'ok'); }
     inp.replaceWith(b);
     renderDocName();
   };
@@ -79,8 +81,9 @@ export const COMMANDS: Command[] = [
   C('mirror', 'Mirror', 'MI', 'solid', 'modify', 'mirror', ['mirror', 'flip', 'symmetry']),
   C('plane', 'Offset plane', 'PL', 'solid', 'construct', 'plane', ['plane', 'construction plane', 'work plane', 'offset plane', 'datum'], () => openDialog('plane')),
   C('overhang', 'Overhang check', 'OV', 'solid', 'print', 'overhang', ['overhang', 'support', 'printability']),
-  C('stl', 'Export STL', 'STL', 'solid', 'print', 'export', ['export', 'stl', 'save mesh', 'print file'], 4),
-  C('3mf', 'Export 3MF', '3MF', 'solid', 'print', 'export', ['export', '3mf', 'slicer', 'print file'], 4),
+  C('stl', 'Export STL', 'STL', 'solid', 'print', 'export', ['export', 'stl', 'save mesh', 'print file'], () => openSaveWindow('export', 'stl')),
+  C('3mf', 'Export 3MF', '3MF', 'solid', 'print', 'export', ['export', '3mf', 'slicer', 'print file'], () => openSaveWindow('export', '3mf')),
+  C('step', 'Export STEP', 'STEP', 'solid', 'print', 'export', ['export', 'step', 'stp', 'cad file', 'exact'], () => openSaveWindow('export', 'step')),
   C('line', 'Line', 'L', 'sketch', 'sketch', 'line', ['line', 'polyline'], () => setTool('line'), { tool: 'line', starts: true }),
   C('rectangle', 'Rectangle', 'REC', 'sketch', 'sketch', 'rect', ['rectangle', 'box', 'square'], () => setTool('rect'), { tool: 'rect', starts: true }),
   C('circle', 'Circle', 'C', 'sketch', 'sketch', 'circle', ['circle'], () => setTool('circle'), { tool: 'circle', starts: true }),
@@ -115,10 +118,10 @@ export const COMMANDS: Command[] = [
   C('grid', 'Toggle grid', 'GR', 'any', 'view', 'grid', ['grid'], () => { state.gridOn = !state.gridOn; applyGridVisibility(); message(state.gridOn ? 'Grid shown' : 'Grid hidden'); }),
   C('origin', 'Toggle origin planes', 'ORI', 'any', 'view', 'origin', ['origin', 'origin planes'], () => toggleVis('origin')),
   C('undo', 'Undo', 'U', 'any', 'view', 'undo', ['undo', 'back'], () => undo()),
-  C('save', 'Save to file', 'SAVE', 'any', 'file', 'save', ['save', 'save file', 'export project', 'backup', 'download'], 4),
-  C('openfile', 'Open file', 'OPEN', 'any', 'file', 'open', ['open', 'open file', 'load', 'import'], 4),
-  C('projects', 'Projects', 'PROJ', 'any', 'file', 'folder', ['projects', 'library', 'recent', 'files', 'home screen'], 4),
-  C('newproject', 'New project', 'NEW', 'any', 'file', 'plus', ['new', 'new project', 'new part', 'new file'], () => { newProject(); renderDocName(); }),
+  C('save', 'Save to file', 'SAVE', 'any', 'file', 'save', ['save', 'save file', 'export project', 'backup', 'download'], () => openSaveWindow('project')),
+  C('openfile', 'Open file', 'OPEN', 'any', 'file', 'open', ['open', 'open file', 'load', 'import'], () => openFilePicker()),
+  C('projects', 'Projects', 'PROJ', 'any', 'file', 'folder', ['projects', 'library', 'recent', 'files', 'home screen'], () => void showLibrary()),
+  C('newproject', 'New project', 'NEW', 'any', 'file', 'plus', ['new', 'new project', 'new part', 'new file'], () => void newProject()),
   C('renameproject', 'Rename project', 'RENP', 'any', 'file', 'rename', ['rename project', 'project name'], () => startDocRename()),
 ];
 

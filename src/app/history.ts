@@ -7,11 +7,10 @@ import { clearHoverLines, drawSketchSelection, setSketchOnTop } from '../sketch/
 import { cancelDialog } from '../tools/dialog';
 import { cancelPick, endPick } from '../tools/pick';
 import { message } from '../ui/message';
-import { applyGridVisibility, V3 } from '../view/scene';
-import { animateTo, VIEWS } from '../view/views';
+import { applyGridVisibility } from '../view/scene';
 import { emit } from './hub';
 import { markDirty, regenerate } from './regenerate';
-import { bodyById, featById, newDoc, state } from './state';
+import { bodyById, featById, state } from './state';
 
 const bodyIdsOf = (f: Feature): string[] => (f.type === 'plane' || f.type === 'sketch' ? [] : ([f.bodyId] as (string | undefined)[]).concat(f.bodyIds || []).filter((x): x is string => !!x));
 
@@ -107,15 +106,6 @@ export function resetScene(): void {
   state.lastSketchId = null;
   state.originPlanesVisible = false;
   applyGridVisibility();
-}
-
-export function newProject(): void {
-  resetScene();
-  state.doc = newDoc();
-  regenerate();
-  emit('mode', 'select');
-  animateTo({ ...VIEWS.home, target: new V3(15, 10, 8), r: 230 });
-  message('New project. Type sk to start a sketch.');
 }
 
 export { finishSketch, markDirty };

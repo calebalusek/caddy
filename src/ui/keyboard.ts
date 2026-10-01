@@ -2,6 +2,7 @@
 import { runCommand } from '../app/commands';
 import { undo } from '../app/history';
 import { state } from '../app/state';
+import { isLibraryOpen } from '../files/project';
 import { isDim } from '../sketch/model';
 import { selectSketch, setOverlaySel, startDimEdit } from '../sketch/session';
 import { advanceSelect, deleteSketchSel, exitTool, hudEnter, hudShown, toolBusy, typeIntoHud } from '../sketch/tools';
@@ -22,6 +23,7 @@ export function initKeyboard(): void {
       if (k === 'o') { e.preventDefault(); runCommand('openfile'); return; }
       if (k === 'z') { if (!inField || (isCommandInput(t) && commandInputEmpty()) || t.closest('.hud')) { e.preventDefault(); undo(); } return; }
     }
+    if (isLibraryOpen()) return; // the library screen handles its own keys
     if (inField || e.ctrlKey || e.metaKey || e.altKey) return;
     const onButton = !!t.matches && t.matches('button, summary, a');
     if (state.active) {

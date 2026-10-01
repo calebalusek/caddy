@@ -23,6 +23,10 @@ Each step ends with tests passing and a git commit.
 Progress notes
 - Step 0 done. Step 1 done; **Offset plane moved up from step 5 into step 1** so the tool-menu
   system and plane picking could be tested with a real tool.
+- Steps 2, 3 and 4 done (2026-10-01). **Checkpoint 1 reached**: sketch → extrude → fillet → save,
+  open, export. Screenshots in `docs/checkpoint-1/`.
+- Measured: the geometry engine is a 23 MB download (7.3 MB compressed), loaded once in the
+  background, then cached.
 
 ## Testing
 - **Geometry**: every line in `ACCEPTANCE-TESTS.md` is an automated test comparing the kernel's exact

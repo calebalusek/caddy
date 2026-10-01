@@ -1,7 +1,7 @@
 // Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
 // Runs wherever the kernel is loaded: the Web Worker in the app, Node in tests.
 import {
-  assembleWire, basicFaceExtrusion, makeCircle, makeFace, makeLine, makeThreePointArc, makeVertex, measureArea, measureDistanceBetween, measureVolume, Vector,
+  assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makeThreePointArc, makeVertex, measureArea, measureDistanceBetween, measureVolume, Vector,
   type Edge, type Face, type Shape3D, type Wire,
 } from 'replicad';
 import { toWorld, vdot, vnorm, vsc, vsub } from '../model/frames';
@@ -183,8 +183,8 @@ function findFace(shape: Shape3D, spec: { n: Vec3; w: number; p: Vec3; surf?: st
   return best;
 }
 
-export function buildModel(steps: BuildStep[]): BuildResult {
-  const sc = new Scope();
+/** Run the timeline's solid features in order. Everything created is tracked in sc and freed by the caller. */
+function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results: StepResult[] } {
   const bodies: BodyState[] = [];
   const body = (id: string): BodyState => { let b = bodies.find((x) => x.id === id); if (!b) { b = { id, shape: null, tags: new Map() }; bodies.push(b); } return b; };
   const results: StepResult[] = [];
@@ -260,8 +260,43 @@ export function buildModel(steps: BuildStep[]): BuildResult {
     }
   }
 
-  const out: BuildResult = { bodies: bodies.filter((b) => b.shape).map((b) => bodyResult(b, sc)), steps: results };
-  sc.end();
-  return out;
+  return { bodies: bodies.filter((b) => b.shape), results };
+}
+
+/** Rebuild every body for display and picking. */
+export function buildModel(steps: BuildStep[]): BuildResult {
+  const sc = new Scope();
+  try {
+    const { bodies, results } = runSteps(steps, sc);
+    return { bodies: bodies.map((b) => bodyResult(b, sc)), steps: results };
+  } finally {
+    sc.end();
+  }
+}
+
+/** Triangles for print files, cut as finely as asked. Only the listed bodies, or all of them. */
+export function exportMeshes(steps: BuildStep[], quality: { tolerance: number; angularTolerance: number }, ids: string[] | null): { id: string; positions: Float32Array; indices: Uint32Array; volume: number }[] {
+  const sc = new Scope();
+  try {
+    return runSteps(steps, sc).bodies.filter((b) => !ids || ids.includes(b.id)).map((b) => {
+      const m = b.shape!.mesh(quality);
+      return { id: b.id, positions: new Float32Array(m.vertices), indices: new Uint32Array(m.triangles), volume: measureVolume(b.shape!) };
+    });
+  } finally {
+    sc.end();
+  }
+}
+
+/** A STEP file (exact geometry, for other CAD programs) of the listed bodies. */
+export async function exportStep(steps: BuildStep[], names: { id: string; name: string }[]): Promise<Uint8Array> {
+  const sc = new Scope();
+  try {
+    const built = runSteps(steps, sc).bodies;
+    const shapes = names.flatMap((n) => { const b = built.find((x) => x.id === n.id); return b ? [{ shape: b.shape!, name: n.name }] : []; });
+    const blob = exportSTEP(shapes, { unit: 'MM', modelUnit: 'MM' });
+    return new Uint8Array(await blob.arrayBuffer());
+  } finally {
+    sc.end();
+  }
 }
 

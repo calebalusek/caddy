@@ -407,3 +407,5 @@ button.selchip{width:100%;text-align:left;cursor:pointer;font:inherit}
 /* ---- rebuild fixes (not in the prototype) ---- */
 /* On narrow windows the tips panel reaches under the Design/Render switch; keep its close button clickable. */
 .start{z-index:7}
+/* Save window: the smoothness choice sits under its own label */
+#smQualityRow{display:flex;flex-direction:column;gap:8px}

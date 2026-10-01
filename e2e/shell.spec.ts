@@ -189,6 +189,7 @@ test.describe('offset plane (first tool on the shared tool-menu system)', () => 
     await expect(dialog(page)).toBeVisible();
     await page.keyboard.press('Escape');
     await typeCommand(page, 'new');
+    await expect(page.locator('#timeline .tl-item')).toHaveCount(0); // the old project is saved first, then cleared
     const s = await state(page);
     expect(s).toMatchObject({ features: [], selection: [], hasDialog: false, hasPick: false });
     expect(s.counters.plane).toBe(0);

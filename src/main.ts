@@ -9,7 +9,9 @@ import './styles/app.css';
 
 import { runCommand } from './app/commands';
 import { emit, on } from './app/hub';
-import { newProject, undo } from './app/history';
+import { undo } from './app/history';
+import { flushSave, importFile, initProjects, newProject, projectFile } from './files/project';
+import { initLibrary } from './ui/library';
 import { regenerate } from './app/regenerate';
 import { feats, state } from './app/state';
 import { $ } from './core/dom';
@@ -76,6 +78,8 @@ startScene();
 regenerate();
 emit('theme');
 message('New part. Type sk or click Sketch, then pick a plane to start drawing.');
+initLibrary();
+void initProjects();
 
 // Test hooks (not used by the UI).
 declare global {
@@ -93,4 +97,4 @@ function sketchScreen(x: number, y: number): { x: number; y: number } | null {
   const sk = state.sketch;
   return sk && sk.frame ? screenOf(toWorld(sk.frame, x, y)) : null;
 }
-window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies, baseBodies };
+window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies, baseBodies, projectFile, importFile, flushSave };

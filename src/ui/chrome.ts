@@ -67,6 +67,7 @@ function initFileMenu(): void {
       { sep: true },
       { label: 'Export STL…', icon: 'export', act: cmd('stl') },
       { label: 'Export 3MF…', icon: 'export', act: cmd('3mf') },
+      { label: 'Export STEP…', icon: 'export', act: cmd('step') },
       { sep: true },
       { label: 'Rename project', icon: 'rename', act: startDocRename },
     ], b.left, b.bottom + 4, btn);

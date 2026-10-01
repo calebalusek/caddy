@@ -44,6 +44,10 @@ export interface DocInfo {
   created: number;
   stored: boolean;
   renamed: boolean;
+  /** Library card picture (a data URL). */
+  thumb?: string | null;
+  /** Last file name used in the Save window, per kind of save. */
+  saveNames?: Record<string, string>;
 }
 
 const newProjId = (): string => 'prj-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);

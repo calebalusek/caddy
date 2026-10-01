@@ -91,6 +91,10 @@ export interface KernelOps {
   testBox: { args: [w: number, d: number, h: number]; result: BodyMesh };
   /** Rebuild every body from the timeline. */
   build: { args: [steps: BuildStep[]]; result: BuildResult };
+  /** Triangles for STL / 3MF at a chosen fineness. ids = which bodies (null = all). */
+  exportMesh: { args: [steps: BuildStep[], quality: { tolerance: number; angularTolerance: number }, ids: string[] | null]; result: { id: string; positions: Float32Array; indices: Uint32Array; volume: number }[] };
+  /** A STEP file of the listed bodies. */
+  exportStep: { args: [steps: BuildStep[], bodies: { id: string; name: string }[]]; result: Uint8Array };
 }
 
 export type OpName = keyof KernelOps;

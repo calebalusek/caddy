@@ -159,6 +159,29 @@ function frame(now: number): void {
   afterHooks.forEach((fn) => fn());
 }
 
+const thumbHidden: THREE.Object3D[] = [gridGroup, originGroup, previewGroup];
+/** Things that should not appear in library pictures (handles, highlights). */
+export const hideInThumbnails = (o: THREE.Object3D): void => { thumbHidden.push(o); };
+
+/** A picture of the scene from a given view, as a JPEG data URL. The user's view is untouched. */
+export function captureView(view: { theta: number; phi: number; r: number; target: V3 }, W: number, H: number): string | null {
+  const was = thumbHidden.map((o) => o.visible);
+  thumbHidden.forEach((o) => { o.visible = false; });
+  camera.position.set(view.target.x + view.r * Math.sin(view.phi) * Math.cos(view.theta), view.target.y + view.r * Math.sin(view.phi) * Math.sin(view.theta), view.target.z + view.r * Math.cos(view.phi));
+  camera.lookAt(view.target);
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  const src = renderer.domElement, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const s = Math.min(src.width / W, src.height / H), sw = W * s, sh = H * s;
+  c.getContext('2d')!.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, W, H);
+  thumbHidden.forEach((o, i) => { o.visible = was[i]; });
+  updateCamera();
+  camera.updateMatrixWorld();
+  renderer.render(scene, camera);
+  return c.toDataURL('image/jpeg', 0.78);
+}
+
 export function startScene(): void {
   applySceneTheme();
   resize();
