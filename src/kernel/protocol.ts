@@ -170,7 +170,7 @@ export interface KernelOps {
   /** Rebuild every body from the timeline. */
   build: { args: [steps: BuildStep[]]; result: BuildResult };
   /** The same, with one more step applied on top: for tools that preview on the real body. */
-  buildDraft: { args: [steps: BuildStep[], draft: BuildStep, haveKey: string | null]; result: DraftResult };
+  buildDraft: { args: [steps: BuildStep[], draft: BuildStep | null, haveKey: string | null]; result: DraftResult };
   /** Triangles for STL / 3MF at a chosen fineness. ids = which bodies (null = all). */
   exportMesh: { args: [steps: BuildStep[], quality: { tolerance: number; angularTolerance: number }, ids: string[] | null]; result: { id: string; positions: Float32Array; indices: Uint32Array; volume: number }[] };
   /** A STEP file of the listed bodies. */

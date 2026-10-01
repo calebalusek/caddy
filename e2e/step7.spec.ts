@@ -228,3 +228,34 @@ test.describe('owner feedback round 1', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('owner feedback round 2: live preview while the arrow is held', () => {
+  test('the fillet preview updates during the drag, not only on release', async ({ page }) => {
+    const errors = await openApp(page);
+    await plateWithHole(page);
+    const e = await screenOf(page, [60, 20, 8]);
+    await page.mouse.move(e.x, e.y); await page.mouse.click(e.x, e.y);
+    await typeCommand(page, 'f');
+    await page.keyboard.type('2');
+    await built(page);
+    // the arrow lies in one of the two faces at the edge
+    const inTop = await page.evaluate(() => {
+      const ed = (window as any).__caddy.baseBodies()[0].edges.find((x: any) => Math.abs(x.mid[0] - 60) < 1e-6 && Math.abs(x.mid[2] - 8) < 1e-6 && Math.abs(x.mid[1] - 20) < 1e-6);
+      return Math.abs(ed.n1[2] - 1) < 1e-6;
+    });
+    const along = (d: number): [number, number, number] => (inTop ? [60 - d, 20, 8] : [60, 20, 8 - d]);
+    const grab = await screenOf(page, along(2 + 5)), far = await screenOf(page, along(2 + 5 + 5));
+    await page.mouse.move(grab.x, grab.y);
+    await page.mouse.down();
+    const before = await page.evaluate(() => ({ n: (window as any).__caddy.builtCount(), v: (window as any).__caddy.shownBodies()[0].volume }));
+    // hold the button down and keep moving: the preview has to follow while the button is still down
+    for (let i = 1; i <= 24; i++) { await page.mouse.move(grab.x + ((far.x - grab.x) * i) / 24, grab.y + ((far.y - grab.y) * i) / 24); await page.waitForTimeout(25); }
+    await page.waitForTimeout(150);
+    const during = await page.evaluate(() => ({ n: (window as any).__caddy.builtCount(), v: (window as any).__caddy.shownBodies()[0].volume, r: (window as any).__caddy.state.active.params.r }));
+    expect(during.n - before.n).toBeGreaterThanOrEqual(4); // several updates, with the mouse still down
+    expect(during.v).toBeLessThan(before.v); // the cut keeps growing as the arrow slides
+    expect(during.r).toBeGreaterThan(2);
+    await page.mouse.up();
+    expect(errors).toEqual([]);
+  });
+});

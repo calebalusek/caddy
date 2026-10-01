@@ -57,10 +57,10 @@ async function buildOnce(): Promise<void> {
   const steps: BuildStep[] = featureSteps(state.features, upTo < 0 ? state.features.length : upTo);
   const draft = A && A.def.draftStep ? A.def.draftStep(A) : null;
   busy++;
-  emit('doc');
+  if (!draft && !(A && A.def.draftStep)) emit('doc'); // a live preview changes nothing in the document: no need to redraw the Browser
   try {
     let baseRes: BuildResult, out: DraftResult | null = null;
-    if (draft) {
+    if (draft || (A && A.def.draftStep)) {
       out = await kernel.call('buildDraft', steps, draft, held ? held.key : null);
       if (out.base) held = { key: out.baseKey, res: out.base };
       baseRes = held!.res;
@@ -69,21 +69,21 @@ async function buildOnce(): Promise<void> {
     const sameBase = baseRes === base;
     base = baseRes;
     shown = baseRes;
-    draftShown = out ? out.draft.bodies : null;
+    draftShown = out && draft ? out.draft.bodies : null;
     baseRes.steps.forEach((s) => { const f = featById(s.id); if (f) { f.error = !!s.error; f.note = s.note || ''; } });
-    if (A && state.active === A) A.note = out ? out.draft.step.note || '' : '';
+    if (A && state.active === A) A.note = out && draft ? out.draft.step.note || '' : '';
     if (!sameBase) {
       state.selection = state.selection.filter((s) => s.kind === 'plane'); // face and edge ids are new after a rebuild
       clearBodyHighlights();
       showBodies(shown.bodies);
     }
     setDiffPreview(out ? out.removed : [], out ? out.added : []);
-    emit('doc', 'select', 'built');
+    if (!out || !sameBase) emit('doc', 'select', 'built'); else emit('built');
   } catch (err) {
     console.error('Rebuild failed', err);
   } finally {
     busy--;
-    if (!busy) emit('doc');
+    if (!busy && !draft && !(A && A.def.draftStep)) emit('doc');
   }
 }
 

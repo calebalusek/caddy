@@ -329,7 +329,7 @@ test.describe('fillet and chamfer', () => {
     await page.mouse.up();
     const v = Number(await page.locator('#f-r').inputValue());
     expect(v).toBeGreaterThan(8); expect(v).toBeLessThan(14);
-    expect(Number.isInteger(v)).toBe(true);
+    expect(Math.round(v * 10) / 10).toBe(v); // tenths of a millimeter
     await expect(page.locator('#dim')).toHaveText(`${v} mm`);
     const r = await built(page);
     expect(24000 - r.bodies[0].volume).toBeCloseTo((1 - Math.PI / 4) * v * v * 30, 5); // the body follows the arrow

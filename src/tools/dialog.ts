@@ -264,11 +264,10 @@ export function updatePreview(): void {
   if (ok) ok.disabled = !res.ok;
   // tools that preview on the real body (fillet, chamfer): rebuild shortly after the last change
   if (A.def.draftStep) {
-    clearTimeout(draftTimer);
-    draftTimer = setTimeout(() => { if (state.active === A) void rebuildSolids(); }, 70);
+    // no waiting: rebuildSolids runs one build at a time and always finishes with the newest value
+    void rebuildSolids();
   }
 }
-let draftTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** Set a choice field from code (e.g. Join/Cut picked automatically). */
 export function setChoice(key: string, value: string): void {
@@ -282,7 +281,6 @@ export function setHint(id: string, text: string): void {
 
 function closeDialog(): void {
   const was = state.active;
-  clearTimeout(draftTimer);
   if (was && was.def.onClose) was.def.onClose(was);
   state.active = null;
   state.hoverKey = null;

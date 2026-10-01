@@ -509,7 +509,7 @@ const cloneMesh = (m: BodyMesh): BodyMesh => ({ ...m, positions: m.positions.sli
  * model with the tool applied, and the volumes the tool removes and adds. Fast: the model is built once and
  * kept; each preview runs just the tool's step, and nothing is meshed except the changed volumes.
  */
-export function buildDraft(steps: BuildStep[], draft: BuildStep, haveKey: string | null = null): DraftResult {
+export function buildDraft(steps: BuildStep[], draft: BuildStep | null, haveKey: string | null = null): DraftResult {
   const key = JSON.stringify(steps);
   if (!draftCache || draftCache.key !== key) {
     if (draftCache) draftCache.sc.end();
@@ -519,6 +519,10 @@ export function buildDraft(steps: BuildStep[], draft: BuildStep, haveKey: string
     draftCache = { key, sc, runner, base: { bodies: runner.bodies.filter((b) => b.shape).map((b) => bodyResult(b, sc)), steps: runner.results.slice() } };
   }
   const c = draftCache, R = c.runner, dsc = new Scope();
+  // no preview yet (the tool is open but not filled in): just have the model ready, so the first preview is quick
+  if (!draft) {
+    return { base: haveKey !== key ? { bodies: c.base.bodies.map((b) => ({ ...b, mesh: cloneMesh(b.mesh) })), steps: c.base.steps } : null, baseKey: key, draft: { bodies: [], step: { id: '' } }, removed: [], added: [] };
+  }
   const saved = R.bodies.map((b) => ({ b, shape: b.shape, tags: b.tags, keeps: b.keeps })), nBodies = R.bodies.length, nRes = R.results.length;
   const baseShapes = R.bodies.filter((b) => b.shape).map((b) => ({ id: b.id, shape: b.shape! }));
   try {
