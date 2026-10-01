@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { emit } from '../app/hub';
 import { markDirty } from '../app/regenerate';
-import { baseBodies, findProfile, whenBuilt } from '../app/solids';
+import { baseBodies, baseBody, findProfile, whenBuilt } from '../app/solids';
 import { bodyById, feats, state, type ProfileSel } from '../app/state';
 import { fmt } from '../core/format';
 import type { BuildStep, Operation } from '../kernel/protocol';
@@ -14,7 +14,7 @@ import type { OtherFeature, Vec3 } from '../model/types';
 import { PT } from '../sketch/model';
 import { refreshProfiles, sketchGroupVisible, toScreen } from '../sketch/visuals';
 import { message } from '../ui/message';
-import { insideAnyBody, setBoldSegments, setHoverEdge, visibleBodies } from '../view/bodies';
+import { insideBase, setBoldSegments, setHoverEdge, visibleBodies } from '../view/bodies';
 import { edgeAtCursor, profileAtCursor } from '../view/hit';
 import { v3 } from '../view/planes';
 import { focusPrimary, registerTool, setChoice, setHint, updateChips, updatePreview, type ActiveDialog } from './dialog';
@@ -72,7 +72,7 @@ function drawAxis(A: Dlg): void {
 
 /** Join, Cut or New body, from where the revolved shape lands. */
 function autoOperation(A: Dlg): Operation {
-  const P = A.params, r = findProfile(P), ax = axisOf(P), bodies = visibleBodies();
+  const P = A.params, r = findProfile(P), ax = axisOf(P), bodies = visibleBodies().filter((v) => baseBody(v.id));
   A.toolBox = undefined;
   if (!r || !ax || !bodies.length) return 'New body';
   const fr = r.sk.frame!, e0 = vnorm(vcross(fr.n, ax.d));
@@ -89,7 +89,7 @@ function autoOperation(A: Dlg): Operation {
   const ang = (Math.min(360, Math.abs(P.angle || 0)) * Math.PI) / 180, a0 = P.direction === 'Symmetric' ? -ang / 2 : P.angle < 0 ? -ang : 0, tm = a0 + ang / 2;
   const q = vsub(toWorld(fr, r.pr.inner![0], r.pr.inner![1]), ax.A), rr = Math.abs(vdot(q, e0));
   const probe = vadd(vadd(ax.A, vsc(ax.d, vdot(q, ax.d))), vadd(vsc(e, rr * Math.cos(tm)), vsc(f, rr * Math.sin(tm))));
-  if (insideAnyBody(v3(probe))) return 'Cut';
+  if (insideBase(v3(probe), baseBodies())) return 'Cut';
   return bodies.some((b) => b.box.intersectsBox(box)) ? 'Join' : 'New body';
 }
 

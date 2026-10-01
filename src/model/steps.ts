@@ -5,6 +5,7 @@ import { extrudeRange, profileSpec } from '../kernel/spec';
 import { profileHint } from '../sketch/geom';
 import { inProfile, sketchProfiles, type Profile } from '../sketch/profiles';
 import { PT } from '../sketch/model';
+import { sweepPath } from './path';
 import { ORIGIN, offsetFrame, toWorld, vnorm, vsc, vsub } from './frames';
 import type { Feature, Frame, PlaneRef, SketchFeature, Vec3 } from './types';
 
@@ -63,7 +64,7 @@ export function findProfileIn(features: Feature[], sel: ProfileParams | null | u
 }
 
 /** Which rebuild step brings back a feature type that is not rebuilt yet. */
-export const LATER: Record<string, number> = { sweep: 6, shell: 7, pattern: 7 };
+export const LATER: Record<string, number> = { shell: 7, pattern: 7 };
 
 /** How a revolve's axis is saved (same as version 1 files). */
 export type AxisRef = { kind: 'origin'; id: 'X' | 'Y' | 'Z' } | { kind: 'line'; sketchId: string; lineId: string } | { kind: 'edge'; bodyId: string; a: Vec3; b: Vec3 };
@@ -108,6 +109,16 @@ export function stepFor(features: Feature[], f: Feature): BuildStep | null {
     if (r) { if (r.pr.key !== P.key) P.key = r.pr.key; P.hint = profileHint(r.pr); }
     const ax = axisWorld(features, () => 'a body', P.axis), ang = Math.abs(+P.angle || 0);
     return { kind: 'revolve', id: f.id, profile: r ? profileSpec(r.sk.frame!, r.pr) : null, axis: ax ? { A: ax.A, d: ax.d } : null, ang0: P.direction === 'Symmetric' ? -ang / 2 : (+P.angle || 0) < 0 ? -ang : 0, angle: ang, operation: P.operation, bodyId: f.bodyId || null };
+  }
+  if (f.type === 'sweep') {
+    const P = f.params as any;
+    let profile = null;
+    if (!P.face) {
+      const r = findProfileIn(features, P);
+      if (r) { if (r.pr.key !== P.key) P.key = r.pr.key; P.hint = profileHint(r.pr); profile = profileSpec(r.sk.frame!, r.pr); }
+    }
+    const path = sweepPath(features, P.path);
+    return { kind: 'sweep', id: f.id, profile, face: P.face || null, path: path.path || null, pathNote: path.err, orientation: P.orientation === 'Parallel' ? 'Parallel' : 'Perpendicular', corners: P.corners === 'Mitered' ? 'Mitered' : 'Round', operation: P.operation, bodyId: f.bodyId || null };
   }
   if (f.type === 'hole') {
     const P = f.params as any;

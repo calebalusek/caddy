@@ -36,7 +36,12 @@ parts for **3D printing**. Built for the owner and other people to use.
   - **Step 5 done** (2026-10-01): Revolve (`src/tools/revolve.ts`), Hole with draggable markers
     (`src/tools/hole.ts`), sketch on a body face with snaps that follow the body
     (`src/sketch/facesnaps.ts`). Both tools preview live on the model through the kernel.
-    **Next: step 6 (Sweep), then step 7 (Shell, Pattern), step 8 (Render view), step 9 (offline + publish).**
+  - **Step 6 done** (2026-10-01): Sweep (`src/tools/sweep.ts`, path math in `src/model/path.ts`,
+    build in `src/kernel/sweep.ts`). Each path section is its own exact piece (prism for lines,
+    revolve for arcs), joined without merging away the section boundary lines (`keeps` discs in
+    `unifyKeeping`); Mitered = trimmed at the bisector plane, Round = path corners replaced by true
+    arcs sized by the prototype's rule (pivot about the corner when there is no room).
+    **Next: step 7 (Shell, Pattern), step 8 (Render view), step 9 (offline + publish).**
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised
@@ -50,8 +55,10 @@ parts for **3D printing**. Built for the owner and other people to use.
 - Kernel lessons (learned by test, keep them): hole loops must run clockwise or the kernel adds
   them instead of cutting; a too-big fillet throws, so it is caught and reported; round faces have
   a "seam" edge that is dropped (not drawn, not pickable); kernel objects are freed by hand
-  (`Scope` in model.ts); face/edge ids change on every rebuild, so saved features point at edges
+  (`Scope` in kernel/scope.ts); face/edge ids change on every rebuild, so saved features point at edges
   geometrically (`src/kernel/match.ts`, same format as version 1 files).
+- Tools that preview live on the real body must pick Join/Cut with `insideBase` (the bodies
+  without the preview), or they see their own preview and flip to Cut.
 - Editing a feature rolls the timeline back to just before it while its menu is open.
 - Old files: `tests/fixtures/make-v1.mjs` drives the prototype to write real version 1 files into
   `tests/fixtures/v1/`. Add one per feature type as each tool is rebuilt.

@@ -10,19 +10,12 @@ import type { P2 } from '../sketch/model';
 import { arcDelta } from '../sketch/profiles';
 import { matchEdge } from './match';
 import type { BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
+import { Scope, tup } from './scope';
+import { rawBoolean, sweepSolid, unifyKeeping, type Disk } from './sweep';
 
 /** Display tessellation: chord error in mm and angle step in radians. */
 export const DISPLAY_QUALITY = { tolerance: 0.02, angularTolerance: 0.2 };
 
-interface Deletable { delete: () => void }
-/** Kernel objects live in WebAssembly memory and must be freed by hand. */
-class Scope {
-  private items: Deletable[] = [];
-  add<T extends Deletable>(o: T): T { this.items.push(o); return o; }
-  all<T extends Deletable>(list: T[]): T[] { list.forEach((o) => this.items.push(o)); return list; }
-  end(): void { this.items.forEach((o) => { try { o.delete(); } catch { /* already freed */ } }); this.items = []; }
-}
-const tup = (v: Vector): Vec3 => { const t = v.toTuple() as Vec3; v.delete(); return t; };
 const r4 = (v: number): number => Math.round(v * 1e4) / 1e4 + 0; // + 0 turns -0 into 0
 
 // ---- profiles → kernel faces ----
@@ -83,7 +76,8 @@ function signature(f: Face): string {
   return type + lo.concat(hi).map(r4).join(',');
 }
 
-interface BodyState { id: string; shape: Shape3D | null; tags: Map<string, string> }
+/** keeps: section boundaries of sweeps in this body, which later joins and cuts must not merge away. */
+interface BodyState { id: string; shape: Shape3D | null; tags: Map<string, string>; keeps: Disk[] }
 
 function retag(result: Shape3D, old: Map<string, string>, tool: Map<string, string> | null, fresh: (f: Face) => string, sc: Scope): Map<string, string> {
   const tags = new Map<string, string>();
@@ -196,22 +190,25 @@ function findFace(shape: Shape3D, spec: { n: Vec3; w: number; p: Vec3; surf?: st
 /** Run the timeline's solid features in order. Everything created is tracked in sc and freed by the caller. */
 function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results: StepResult[] } {
   const bodies: BodyState[] = [];
-  const body = (id: string): BodyState => { let b = bodies.find((x) => x.id === id); if (!b) { b = { id, shape: null, tags: new Map() }; bodies.push(b); } return b; };
+  const body = (id: string): BodyState => { let b = bodies.find((x) => x.id === id); if (!b) { b = { id, shape: null, tags: new Map(), keeps: [] }; bodies.push(b); } return b; };
   const results: StepResult[] = [];
   const keep = <T extends Shape3D>(s: T): T => sc.add(s);
   /** Join the tool to a body, cut it from every body it touches, or make it a new body. Returns what went wrong, if anything. */
-  const combine = (op: Operation, bodyId: string | null, tool: Shape3D, toolTags: Map<string, string>, tbox: [Vec3, Vec3], tag: string): string | null => {
+  /** Join or cut. A body with sweep sections keeps their boundary lines; everything else merges as usual. */
+  const bool = (op: 'fuse' | 'cut', b: BodyState, tool: Shape3D): Shape3D =>
+    keep(b.keeps.length ? unifyKeeping(sc.add(rawBoolean(op, b.shape!, tool)), b.keeps, sc) : op === 'fuse' ? b.shape!.fuse(tool) : b.shape!.cut(tool));
+  const combine = (op: Operation, bodyId: string | null, tool: Shape3D, toolTags: Map<string, string>, tbox: [Vec3, Vec3], tag: string, toolKeeps: Disk[] = []): string | null => {
     const fresh = (): string => tag;
     if (op === 'Cut') {
       const targets = bodies.filter((b) => b.shape && boxesTouch(boxOf(b.shape), tbox));
       if (!targets.length) return 'nothing to cut';
-      targets.forEach((b) => { const out = keep(b.shape!.cut(tool)); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; });
+      targets.forEach((b) => { b.keeps = b.keeps.concat(toolKeeps); const out = bool('cut', b, tool); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; });
       return null;
     }
     if (!bodyId) return 'it has no body';
     const b = body(bodyId);
-    if (op === 'Join' && b.shape) { const out = keep(b.shape.fuse(tool)); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; }
-    else { b.shape = tool; b.tags = toolTags; }
+    if (op === 'Join' && b.shape) { b.keeps = b.keeps.concat(toolKeeps); const out = bool('fuse', b, tool); b.tags = retag(out, b.tags, toolTags, fresh, sc); b.shape = out; }
+    else { b.shape = tool; b.tags = toolTags; b.keeps = toolKeeps.slice(); }
     return null;
   };
 
@@ -270,6 +267,25 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
         sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':r' + k++); });
         const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x');
         if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'sweep') {
+        let face: Face | null = null;
+        if (st.face) {
+          const src = bodies.find((b) => b.id === st.face!.bodyId);
+          const f = src && src.shape ? findFace(src.shape, st.face, src.tags, sc) : null;
+          if (!f) { res.error = true; res.note = 'its face is gone'; continue; }
+          face = sc.add(f.clone());
+        } else if (st.profile) face = sc.add(profileFace(st.profile, 0, sc));
+        if (!face) { res.error = true; res.note = 'its profile is gone'; continue; }
+        const r = sweepSolid(face, st, sc);
+        if ('note' in r) { res.error = true; res.note = r.note; continue; }
+        const tool = r.tool, tbox = boxOf(tool);
+        res.box = tbox;
+        const toolTags = new Map<string, string>();
+        r.caps.forEach((c, k) => toolTags.set(signature(c), st.id + ':cap' + k));
+        let k = 0;
+        sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':w' + k++); });
+        const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x', r.keeps);
+        if (bad) { res.error = true; res.note = bad; }
       } else if (st.kind === 'hole') {
         const R = st.d / 2;
         if (!(R > 0)) { res.error = true; res.note = 'give the hole a diameter'; continue; }
@@ -305,7 +321,7 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
           const drill = keep(revolution(sc.add(makePolygon(prof.map(([r, z]) => vadd(vadd(c, vsc(e, r)), vsc(dir, z))))), c, dir, 360));
           const tbox = boxOf(drill);
           const targets = bodies.filter((b) => b.shape && boxesTouch(boxOf(b.shape), tbox));
-          targets.forEach((b) => { const out = keep(b.shape!.cut(drill)); b.tags = retag(out, b.tags, null, () => st.id + ':h' + k, sc); b.shape = out; });
+          targets.forEach((b) => { const out = bool('cut', b, drill); b.tags = retag(out, b.tags, null, () => st.id + ':h' + k, sc); b.shape = out; });
           if (targets.length) drilled++;
         });
         if (gone === st.at.length) { res.error = true; res.note = 'its hole points are gone'; }

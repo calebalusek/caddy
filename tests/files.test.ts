@@ -58,6 +58,15 @@ describe('project files', () => {
     expect(r.bodies[0].volume).toBeCloseTo(Math.PI * 300 * 5 - Math.PI * 4 * 5, 5);
   });
 
+  it('opens a version 1 file with a Sweep (Round corners): the exact bar, rounded inside and out', () => {
+    const { features, steps } = open(v1('sweep-round-l'));
+    expect(features.map((f) => f.type)).toEqual(['sketch', 'sketch', 'sweep']);
+    const r = buildModel(steps);
+    expect(r.steps.filter((s) => s.error)).toEqual([]);
+    const rho = (10.5 * (1 + Math.SQRT1_2)) / 2; // the prototype's bend radius rule, kept
+    expect(r.bodies[0].volume).toBeCloseTo(100 * (2 * (50 - rho) + (Math.PI / 2) * rho), 5);
+  });
+
   it('round-trips: save as version 2, open again, identical model', () => {
     const first = open(v1('plate-pocket-fillet'));
     first.features.filter((f) => f.type === 'sketch').forEach((s, i) => { if (s.type === 'sketch') s.hist = ['snapshot-' + i]; });

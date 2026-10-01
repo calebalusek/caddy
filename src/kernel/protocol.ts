@@ -17,6 +17,13 @@ export type EdgeRef =
 
 export type Operation = 'Join' | 'Cut' | 'New body';
 
+/** One piece of a sweep path in the path sketch's own coordinates: an exact line or arc. A full circle is one arc with full = true. */
+export type PathSeg =
+  | { cid: string; type: 'line'; a: P2; b: P2 }
+  | { cid: string; type: 'arc'; a: P2; b: P2; c: P2; r: number; ccw: boolean; full?: boolean };
+/** A sweep path: connected pieces in order, on the plane of the sketch they were drawn in. */
+export interface PathSpec { frame: Frame; segs: PathSeg[]; closed: boolean }
+
 export type BuildStep =
   | {
       kind: 'extrude';
@@ -54,7 +61,23 @@ export type BuildStep =
       cbD: number;
       cbDepth: number;
       csD: number;
+    }
+  | {
+      kind: 'sweep';
+      id: string;
+      profile: ProfileSpec | null;
+      face: FaceSpec | null;
+      path: PathSpec | null;
+      /** Why there is no path, for the feature's warning. */
+      pathNote?: string;
+      /** Perpendicular: the profile turns with the path. Parallel: it keeps its direction. */
+      orientation: 'Perpendicular' | 'Parallel';
+      /** Sharp path corners: replaced by a smooth bend, or joined with a mitre. */
+      corners: 'Round' | 'Mitered';
+      operation: Operation;
+      bodyId: string | null;
     };
+export type SweepStep = Extract<BuildStep, { kind: 'sweep' }>;
 export type HoleSpot = { c: Vec3; dir: Vec3 } | { face: FaceSpec };
 
 export interface FaceInfo {

@@ -45,6 +45,10 @@ async function sketchOn(ref, build) {
         con({ type: 'horizontal', l: l[0] }); con({ type: 'vertical', l: l[1] }); con({ type: 'horizontal', l: l[2] }); con({ type: 'vertical', l: l[3] });
         con({ type: 'length', l: l[0], v: w, off: -8 }); con({ type: 'length', l: l[1], v: h, off: -8 });
       }
+      if (s.path) { // a chain of lines through the given points
+        const ids = s.path.map(([x, y]) => (x === 0 && y === 0 ? 'O' : addPt(x, y)));
+        ids.slice(1).forEach((b, i) => line(ids[i], b));
+      }
       if (s.circle) { const [x, y, r] = s.circle, id = 'c' + (++sk.nid); sk.curves.push({ id, type: 'circle', c: addPt(x, y), r }); con({ type: 'diameter', c: id, v: r * 2, ang: 0.785 }); }
     }
     c.solveSketch(sk);
@@ -95,6 +99,20 @@ await page.evaluate(() => { const c = window.__caddy, sk = c.state.features[0]; 
 await feature('revolve', { axis: { kind: 'origin', id: 'Z' }, angle: 360 });
 await feature('hole', { pts: [{ kind: 'face', bodyId: 'b1', surf: '', n: [0, 0, 1], w: 5, p: [15, 0, 5] }], d: 4 });
 await save('revolve-hole');
+
+// ---- 3. a 10 × 10 bar swept along an L-shaped path (up 50, across 50) with Round corners ----
+await page.evaluate(() => window.__caddy.newProject());
+await page.waitForTimeout(300);
+await sketchOn({ kind: 'origin', id: 'XZ' }, [{ path: [[0, 0], [0, 50], [50, 50]] }]);
+await sketchOn({ kind: 'origin', id: 'XY' }, [{ rect: [-5, -5, 10, 10] }]);
+await page.evaluate(() => { const c = window.__caddy, sk = c.state.features.filter((f) => f.type === 'sketch')[1]; c.state.selected = { sketchId: sk.id, key: sk.profiles[0].key }; });
+await page.evaluate(() => {
+  const c = window.__caddy, p = c.state.features[0];
+  c.openDialog('sweep');
+  Object.assign(c.state.active.params, { path: { sketchId: p.id, curveIds: p.curves.map((x) => x.id) }, orientation: 'Perpendicular', corners: 'Round' });
+  c.commit();
+});
+await save('sweep-round-l');
 
 await browser.close();
 void cmd; void at;

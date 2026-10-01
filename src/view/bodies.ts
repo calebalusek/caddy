@@ -125,6 +125,29 @@ export function insideAnyBody(pt: V3): boolean {
   });
 }
 
+/**
+ * The same test against the model without any open tool's live preview (the bodies as the timeline
+ * built them), so a tool that previews on the real body does not see its own preview when it picks Join or Cut.
+ */
+const baseMeshes = new WeakMap<BodyResult, THREE.Mesh>();
+export function insideBase(pt: V3, bodies: BodyResult[]): boolean {
+  return bodies.some((b) => {
+    if (!isVisible(b.id) || !new THREE.Box3(new V3(...b.box[0]), new V3(...b.box[1])).containsPoint(pt)) return false;
+    let m = baseMeshes.get(b);
+    if (!m) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(b.mesh.positions, 3));
+      geo.setIndex(new THREE.BufferAttribute(b.mesh.indices, 1));
+      m = new THREE.Mesh(geo, testMat);
+      baseMeshes.set(b, m);
+    }
+    testRay.set(pt, testDir);
+    let n = 0, last = -1;
+    testRay.intersectObject(m, false).forEach((h) => { if (h.distance - last > 1e-5) { n++; last = h.distance; } });
+    return n % 2 === 1;
+  });
+}
+
 // ---- highlights ----
 const hovFace = new THREE.Mesh(new THREE.BufferGeometry(), faceHovMat);
 hovFace.renderOrder = 6; hovFace.visible = false; scene.add(hovFace);
