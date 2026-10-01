@@ -51,7 +51,11 @@ parts for **3D printing**. Built for the owner and other people to use.
     (`src/view/materials.ts`); the look is saved per body in `.caddy.json`. Render lighting is tuned
     (`environmentIntensity` 0.32, exposure 1.0, sun 0.7π) because current three.js is brighter than
     the prototype's r128; Design view is untouched.
-    **Next: step 9 (offline + publish), step 10 (Mirror, Overhang, Text, Thread).**
+  - **Step 9 prepared** (2026-10-01): offline service worker written by the build (`vite.config.ts`),
+    manifest + icon, About/licenses page (`public/licenses.html`, LGPL notice), GitHub Pages workflow
+    (`.github/workflows/pages.yml`), offline test (`e2e/offline.spec.ts`). **Not published yet**: waiting
+    for the owner's GitHub repository.
+    **Next: publish (step 9), then step 10 (Mirror, Overhang, Text, Thread).**
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised

@@ -44,6 +44,7 @@ const ICONS: Record<string, string> = {
   save:'<path d="M5 4h11l3 3v13H5z"/><path class="af" d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="5"/>',
   open:'<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h7.5A1.5 1.5 0 0 1 20 9.5V11"/><path class="af" d="M3 19l3-8h16l-3 8z"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  help:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5"/><circle cx="12" cy="8" r=".6"/>',
   copy:'<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
   more:'<circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/>',
   appearance:'<circle class="af" cx="12" cy="12" r="8"/><path d="M8.5 9.5a4 4 0 0 1 4-2"/><path class="a" d="M4 12h16"/>',

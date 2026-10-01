@@ -88,6 +88,19 @@ message('New part. Type sk or click Sketch, then pick a plane to start drawing.'
 initLibrary();
 void initProjects();
 
+// Offline: once the files are saved on this device, CADDY opens with no internet. A new version waits
+// until CADDY is closed and reopened, so nothing changes under the user's feet while they work.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then((reg) => {
+    const tell = (): void => message('A new version of CADDY is ready. Close and reopen it to use it.');
+    if (reg.waiting && navigator.serviceWorker.controller) tell();
+    reg.addEventListener('updatefound', () => {
+      const w = reg.installing;
+      if (w) w.addEventListener('statechange', () => { if (w.state === 'installed' && navigator.serviceWorker.controller) tell(); });
+    });
+  }).catch(() => { /* offline support is a bonus; the app works without it */ });
+}
+
 // Test hooks (not used by the UI).
 declare global {
   interface Window { __caddy: Record<string, unknown> }

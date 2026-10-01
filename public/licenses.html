@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About CADDY and licenses</title>
+<style>body{font:16px/1.55 system-ui,sans-serif;max-width:46rem;margin:2rem auto;padding:0 1rem;color:#1b2026}h1{font-size:1.6rem}h2{font-size:1.1rem;margin-top:1.8rem}code{background:#eef0f2;padding:0 .25em;border-radius:3px}a{color:#0b6bcb}</style></head>
+<body>
+<h1>About CADDY</h1>
+<p>CADDY is a parametric 3D CAD program for designing parts for 3D printing. It runs entirely in your browser:
+there are no accounts and nothing is uploaded. Your projects are stored on your own device.</p>
+
+<h2>Geometry engine: OpenCascade (LGPL 2.1)</h2>
+<p>CADDY's solid modelling is done by <strong>OpenCascade Technology (OCCT)</strong>, compiled to WebAssembly
+(the <code>replicad-opencascadejs</code> build of <a href="https://github.com/donalffons/opencascade.js">opencascade.js</a>).
+OpenCascade is free software under the <a href="licenses/OpenCascade-LGPL-2.1.txt">GNU Lesser General Public License, version 2.1</a>.</p>
+<ul>
+<li>OpenCascade source code: <a href="https://github.com/Open-Cascade-SAS/OCCT">github.com/Open-Cascade-SAS/OCCT</a></li>
+<li>Build used here (source and build files): <a href="https://github.com/sgenoud/replicad/tree/main/packages/replicad-opencascadejs">replicad-opencascadejs</a></li>
+<li>The engine is a separate file (<code>assets/*.wasm</code>) loaded by the page, so it can be replaced with your own build of the same library.</li>
+</ul>
+
+<h2>Other components</h2>
+<ul>
+<li><a href="https://github.com/sgenoud/replicad">replicad</a> (geometry library): <a href="licenses/replicad-MIT.txt">MIT license</a></li>
+<li><a href="https://threejs.org">three.js</a> (3D display): <a href="licenses/three.js-MIT.txt">MIT license</a></li>
+<li><a href="https://github.com/jpt/barlow">Barlow</a> and Barlow Condensed (fonts): <a href="licenses/Barlow-OFL-1.1.txt">SIL Open Font License 1.1</a></li>
+</ul>
+<p><a href="./">Back to CADDY</a></p>
+</body></html>

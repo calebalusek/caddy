@@ -70,6 +70,8 @@ function initFileMenu(): void {
       { label: 'Export STEP…', icon: 'export', act: cmd('step') },
       { sep: true },
       { label: 'Rename project', icon: 'rename', act: startDocRename },
+      { sep: true },
+      { label: 'About and licenses', icon: 'help', act: () => { window.open('licenses.html', '_blank', 'noopener'); } },
     ], b.left, b.bottom + 4, btn);
   });
   $('#docName').addEventListener('click', startDocRename);
