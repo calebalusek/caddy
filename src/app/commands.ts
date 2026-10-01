@@ -10,6 +10,7 @@ import { saveUsage, state } from './state';
 import { finishSketch, lookAtSketch, startSketchPick } from '../sketch/session';
 import { setTool } from '../sketch/tools';
 import { openDialog } from '../tools/dialog';
+import { openPattern } from '../tools/pattern';
 import { endPick } from '../tools/pick';
 import { message } from '../ui/message';
 import { applyGridVisibility } from '../view/scene';
@@ -76,8 +77,8 @@ export const COMMANDS: Command[] = [
   C('fillet', 'Fillet', 'F', 'solid', 'modify', 'fillet', ['fillet', 'round', 'radius', 'round edge'], () => openDialog('fillet')),
   C('chamfer', 'Chamfer', 'CHA', 'solid', 'modify', 'chamfer', ['chamfer', 'bevel', 'break edge'], () => openDialog('chamfer')),
   C('shell', 'Shell', 'SH', 'solid', 'modify', 'shell', ['shell', 'hollow'], () => openDialog('shell')),
-  C('patrect', 'Rectangular pattern', 'PTR', 'solid', 'modify', 'pattern', ['pattern', 'array', 'grid'], 7),
-  C('patcirc', 'Circular pattern', 'PTC', 'solid', 'modify', 'pattern', ['pattern', 'polar array', 'circular', 'bolt circle'], 7),
+  C('patrect', 'Rectangular pattern', 'PTR', 'solid', 'modify', 'pattern', ['pattern', 'array', 'grid'], () => openPattern('Rectangular')),
+  C('patcirc', 'Circular pattern', 'PTC', 'solid', 'modify', 'pattern', ['pattern', 'polar array', 'circular', 'bolt circle'], () => openPattern('Circular')),
   C('mirror', 'Mirror', 'MI', 'solid', 'modify', 'mirror', ['mirror', 'flip', 'symmetry']),
   C('plane', 'Offset plane', 'PL', 'solid', 'construct', 'plane', ['plane', 'construction plane', 'work plane', 'offset plane', 'datum'], () => openDialog('plane')),
   C('overhang', 'Overhang check', 'OV', 'solid', 'print', 'overhang', ['overhang', 'support', 'printability']),

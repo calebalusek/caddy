@@ -10,6 +10,7 @@ import type { P2 } from '../sketch/model';
 import { arcDelta } from '../sketch/profiles';
 import { matchEdge } from './match';
 import type { BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, FaceSpec, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
+import { patternRelocates, patternTransforms, type Xf } from '../model/pattern';
 import { Scope, tup } from './scope';
 import { thickSolid } from './shell';
 import { rawBoolean, sweepSolid, unifyKeeping, type Disk } from './sweep';
@@ -208,6 +209,12 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
   const bodies: BodyState[] = [];
   const body = (id: string): BodyState => { let b = bodies.find((x) => x.id === id); if (!b) { b = { id, shape: null, tags: new Map(), keeps: [] }; bodies.push(b); } return b; };
   const results: StepResult[] = [];
+  /** Every tool shape a feature made, so a pattern can copy it. A pattern that moves the original keeps it from being applied where it was. */
+  interface ToolRec { op: Operation; bodyId: string | null; tool: Shape3D; toolTags: Map<string, string> }
+  const toolCache = new Map<string, ToolRec[]>();
+  const suppressed = new Set<string>();
+  steps.forEach((s) => { if (s.kind === 'pattern' && s.params.what === 'Features' && patternRelocates(s.params)) s.params.feats.forEach((id) => suppressed.add(id)); });
+  let cur = '';
   const keep = <T extends Shape3D>(s: T): T => sc.add(s);
   /** Join the tool to a body, cut it from every body it touches, or make it a new body. Returns what went wrong, if anything. */
   /** Join or cut. A body with sweep sections keeps their boundary lines; everything else merges as usual. */
@@ -215,6 +222,9 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
     keep(b.keeps.length ? unifyKeeping(sc.add(rawBoolean(op, b.shape!, tool)), b.keeps, sc) : op === 'fuse' ? b.shape!.fuse(tool) : b.shape!.cut(tool));
   const combine = (op: Operation, bodyId: string | null, tool: Shape3D, toolTags: Map<string, string>, tbox: [Vec3, Vec3], tag: string, toolKeeps: Disk[] = []): string | null => {
     const fresh = (): string => tag;
+    if (!toolCache.has(cur)) toolCache.set(cur, []);
+    toolCache.get(cur)!.push({ op, bodyId, tool, toolTags });
+    if (suppressed.has(cur)) return null;
     if (op === 'Cut') {
       const targets = bodies.filter((b) => b.shape && boxesTouch(boxOf(b.shape), tbox));
       if (!targets.length) return 'nothing to cut';
@@ -230,6 +240,7 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
 
   for (const st of steps) {
     const res: StepResult = { id: st.id };
+    cur = st.id;
     results.push(res);
     try {
       if (st.kind === 'extrude') {
@@ -302,6 +313,71 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
         sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':w' + k++); });
         const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x', r.keeps);
         if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'pattern') {
+        const P = st.params;
+        const centerOf = (s: Shape3D): Vec3 => { const [lo, hi] = boxOf(s); return [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2]; };
+        const widthOf = (s: Shape3D) => {
+          const V = s.mesh(DISPLAY_QUALITY).vertices, [blo, bhi] = boxOf(s);
+          return (d: Vec3): number => {
+            const k = [0, 1, 2].find((i) => Math.abs(Math.abs(d[i]) - 1) < 1e-9); // along an axis: the exact box, not the facets
+            if (k !== undefined) return bhi[k] - blo[k];
+            let lo = Infinity, hi = -Infinity; for (let i = 0; i < V.length; i += 3) { const t = V[i] * d[0] + V[i + 1] * d[1] + V[i + 2] * d[2]; lo = Math.min(lo, t); hi = Math.max(hi, t); } return isFinite(lo) ? hi - lo : 0; };
+        };
+        const place = (s: Shape3D, x: Xf): Shape3D => {
+          let c: Shape3D = s.clone();
+          if (vlen(x.o) > 1e-12) c = c.translate(x.o);
+          if (x.rot && Math.abs(x.rot.deg) > 1e-12) c = c.rotate(x.rot.deg, x.rot.C, x.rot.D);
+          return keep(c);
+        };
+        /** The copy's faces carry the original's tags (with the pattern's mark) so later features can still find them. */
+        const remap = (orig: Shape3D, copy: Shape3D, tags: Map<string, string>, mark: string | null): Map<string, string> => {
+          const a = sc.all(orig.faces), b = sc.all(copy.faces), out = new Map<string, string>();
+          if (a.length !== b.length) return out;
+          a.forEach((f, i) => { const t = tags.get(signature(f)); if (t) out.set(signature(b[i]), mark ? mark + '|' + t : t); });
+          return out;
+        };
+        let slot = 0, gone = 0, short = 0, missed = 0, made = 0;
+        const fail = (msg: string): void => { res.error = true; res.note = msg; };
+        if (P.what === 'Bodies') {
+          P.bodies.forEach((id) => {
+            const b = bodies.find((x) => x.id === id);
+            if (!b || !b.shape) { gone++; return; }
+            const T = patternTransforms(P, centerOf(b.shape), widthOf(b.shape));
+            if (T.err) { fail(T.err); return; }
+            const orig = b.shape, otags = b.tags;
+            T.list.forEach((x, ti) => {
+              const copy = place(orig, x);
+              if (T.relocate && ti === 0) { b.shape = copy; b.tags = remap(orig, copy, otags, null); b.keeps = []; made++; return; }
+              const nid = st.bodyIds[slot++];
+              if (!nid) { short++; return; }
+              const nb = body(nid);
+              nb.shape = copy; nb.tags = remap(orig, copy, otags, st.id + ':' + ti); nb.keeps = []; made++;
+            });
+          });
+          if (!res.error && gone) fail(gone === P.bodies.length ? 'its bodies are gone' : gone + ' of its bodies are gone');
+          else if (!res.error && !P.bodies.length) fail('click a body to copy');
+        } else {
+          P.feats.forEach((id) => {
+            const recs = toolCache.get(id);
+            if (!recs || !recs.length) { gone++; return; }
+            recs.forEach((rec) => {
+              const T = patternTransforms(P, centerOf(rec.tool), widthOf(rec.tool));
+              if (T.err) { fail(T.err); return; }
+              T.list.forEach((x, ti) => {
+                const copy = place(rec.tool, x), first = T.relocate && ti === 0;
+                let bodyId = rec.bodyId;
+                if (!first && rec.op === 'New body') { bodyId = st.bodyIds[slot++] || null; if (!bodyId) { short++; return; } }
+                const bad = combine(rec.op, bodyId, copy, remap(rec.tool, copy, rec.toolTags, st.id + ':' + ti), boxOf(copy), st.id + ':x');
+                if (bad) missed++; else made++;
+              });
+            });
+          });
+          if (!res.error && gone) fail(gone === P.feats.length ? 'the feature to copy is gone' : gone + ' of its features are gone');
+          else if (!res.error && !P.feats.length) fail('click a face of the feature to copy');
+        }
+        if (!res.error && missed) fail(missed + (missed > 1 ? ' copies missed' : ' copy missed') + ' the body');
+        if (!res.error && short) fail('its new bodies are not set up yet');
+        if (!res.error && !made) fail('set a count of 2 or more');
       } else if (st.kind === 'shell') {
         const b = st.bodyId ? bodies.find((x) => x.id === st.bodyId) : null;
         if (!b || !b.shape) { res.error = true; res.note = 'its body is gone'; continue; }
@@ -357,10 +433,7 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
           } else { c = spot.c; dir = vnorm(spot.dir); }
           const e = vnorm(Math.abs(dir[0]) < 0.9 ? vcross(dir, [1, 0, 0]) : vcross(dir, [0, 1, 0]));
           const drill = keep(revolution(sc.add(makePolygon(prof.map(([r, z]) => vadd(vadd(c, vsc(e, r)), vsc(dir, z))))), c, dir, 360));
-          const tbox = boxOf(drill);
-          const targets = bodies.filter((b) => b.shape && boxesTouch(boxOf(b.shape), tbox));
-          targets.forEach((b) => { const out = bool('cut', b, drill); b.tags = retag(out, b.tags, null, () => st.id + ':h' + k, sc); b.shape = out; });
-          if (targets.length) drilled++;
+          if (!combine('Cut', null, drill, new Map(), boxOf(drill), st.id + ':h' + k)) drilled++;
         });
         if (gone === st.at.length) { res.error = true; res.note = 'its hole points are gone'; }
         else if (gone) { res.error = true; res.note = `${gone} of its hole points are gone`; }

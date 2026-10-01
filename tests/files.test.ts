@@ -75,6 +75,14 @@ describe('project files', () => {
     expect(r.bodies[0].volume).toBeCloseTo(7152, 5);
   });
 
+  it('opens a version 1 file with a Pattern: six holes, exact volume', () => {
+    const { features, steps } = open(v1('pattern-grid'));
+    expect(features.map((f) => f.type)).toEqual(['sketch', 'extrude', 'hole', 'pattern']);
+    const r = buildModel(steps);
+    expect(r.steps.filter((s) => s.error)).toEqual([]);
+    expect(r.bodies[0].volume).toBeCloseTo(60 * 40 * 8 - 6 * Math.PI * 9 * 8, 5);
+  });
+
   it('round-trips: save as version 2, open again, identical model', () => {
     const first = open(v1('plate-pocket-fillet'));
     first.features.filter((f) => f.type === 'sketch').forEach((s, i) => { if (s.type === 'sketch') s.hist = ['snapshot-' + i]; });

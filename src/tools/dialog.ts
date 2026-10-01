@@ -207,6 +207,18 @@ function applyShowIf(): void {
   });
 }
 
+/** The tool changed its own values (picked a circle, switched Objects): show them in the menu, and show or hide the fields that depend on them. */
+export function syncFields(): void {
+  const A = state.active;
+  if (!A) return;
+  A.def.fields.concat(A.def.advanced || []).forEach((f) => {
+    if (f.kind === 'length') { const el = dialogEl.querySelector<HTMLInputElement>('#f-' + f.key); if (el) el.value = fmt(A.params[f.key] || 0); }
+    else if (f.kind === 'choice') dialogEl.querySelectorAll<HTMLInputElement>(`input[name="f-${f.key}"]`).forEach((i) => { i.checked = i.value === A.params[f.key]; });
+  });
+  applyShowIf(); updateChips();
+  placePanel(dialogEl);
+}
+
 export function focusPrimary(): void {
   const inp = dialogEl.querySelector<HTMLInputElement>('.len-input.primary') || dialogEl.querySelector<HTMLInputElement>('.len-input');
   if (inp) { inp.focus({ preventScroll: true }); inp.select(); }

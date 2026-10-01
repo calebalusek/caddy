@@ -6,6 +6,12 @@ import { profileHint } from '../sketch/geom';
 import { inProfile, sketchProfiles, type Profile } from '../sketch/profiles';
 import { PT } from '../sketch/model';
 import { sweepPath } from './path';
+import type { PatternParams } from './pattern';
+
+const DEFAULT_PATTERN: PatternParams = {
+  ptype: 'Rectangular', what: 'Features', feats: [], bodies: [], layout: 'Spacing', dir1: 'X', n1: 2, d1: 0, dir2: 'None', n2: 2, d2: 0, v1: null, v2: null, e1: null, e2: null,
+  cols: 2, rows: 2, gaps: 'Equal', m1: 0, m2: 0, axis: 'Z', axC: null, axD: null, radius: 0, count: 4, angle: 360,
+};
 import { ORIGIN, offsetFrame, toWorld, vnorm, vsc, vsub } from './frames';
 import type { Feature, Frame, PlaneRef, SketchFeature, Vec3 } from './types';
 
@@ -64,7 +70,7 @@ export function findProfileIn(features: Feature[], sel: ProfileParams | null | u
 }
 
 /** Which rebuild step brings back a feature type that is not rebuilt yet. */
-export const LATER: Record<string, number> = { pattern: 7 };
+export const LATER: Record<string, number> = {};
 
 /** How a revolve's axis is saved (same as version 1 files). */
 export type AxisRef = { kind: 'origin'; id: 'X' | 'Y' | 'Z' } | { kind: 'line'; sketchId: string; lineId: string } | { kind: 'edge'; bodyId: string; a: Vec3; b: Vec3 };
@@ -119,6 +125,10 @@ export function stepFor(features: Feature[], f: Feature): BuildStep | null {
     }
     const path = sweepPath(features, P.path);
     return { kind: 'sweep', id: f.id, profile, face: P.face || null, path: path.path || null, pathNote: path.err, orientation: P.orientation === 'Parallel' ? 'Parallel' : 'Perpendicular', corners: P.corners === 'Mitered' ? 'Mitered' : 'Round', operation: P.operation, bodyId: f.bodyId || null };
+  }
+  if (f.type === 'pattern') {
+    const P = f.params as any;
+    return { kind: 'pattern', id: f.id, params: { ...DEFAULT_PATTERN, ...P, feats: P.feats || [], bodies: P.bodies || [] }, bodyIds: (f.bodyIds as string[]) || [] };
   }
   if (f.type === 'shell') {
     const P = f.params as any, bodyId = (P.bodyId || f.bodyId || null) as string | null;

@@ -1,4 +1,5 @@
 // Messages between the UI thread and the geometry worker. Plain data only.
+import type { PatternParams } from '../model/pattern';
 import type { Frame, Vec3 } from '../model/types';
 import type { Edge2 } from '../sketch/profiles';
 import type { P2 } from '../sketch/model';
@@ -70,6 +71,13 @@ export type BuildStep =
       faces: FaceSpec[];
       thickness: number;
       direction: 'Inside' | 'Outside';
+    }
+  | {
+      kind: 'pattern';
+      id: string;
+      params: PatternParams;
+      /** Bodies made by the copies (one per copy that becomes a new body), in order. */
+      bodyIds: string[];
     }
   | {
       kind: 'sweep';

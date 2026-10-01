@@ -29,6 +29,7 @@ Progress notes
   size arrow and step-back Ctrl+Z. Step 5 done (Revolve, Hole, sketch on face).
 - Step 6 done: Sweep with Round and Mitered corners, section lines, exact volumes
   (screenshots in `docs/checkpoint-3/`).
+- Step 7 done: Shell (inside/outside/closed hollow) and Pattern (rectangular, fit to edges, circular, bodies).
 - Measured: the geometry engine is a 23 MB download (7.3 MB compressed), loaded once in the
   background, then cached.
 

@@ -123,5 +123,20 @@ await feature('extrude', { distance: 20 });
 await feature('shell', { bodyId: 'b1', faces: [{ surf: 'e1:top', n: [0, 0, 1], w: 20, p: [20, 15, 20], curved: false }], thickness: 2, direction: 'Inside' });
 await save('shell-open-box');
 
+// ---- 5. a plate with a Ø6 hole, patterned 3 × 2 (15 × 12 spacing), then a second pattern: fit to edges ----
+await page.evaluate(() => window.__caddy.newProject());
+await page.waitForTimeout(300);
+await sketchOn({ kind: 'origin', id: 'XY' }, [{ rect: [0, 0, 60, 40] }]);
+await page.evaluate(() => { const c = window.__caddy, sk = c.state.features[0]; c.state.selected = { sketchId: sk.id, key: sk.profiles[0].key }; });
+await feature('extrude', { distance: 8 });
+await feature('hole', { pts: [{ kind: 'face', bodyId: 'b1', surf: '', n: [0, 0, 1], w: 8, p: [15, 12, 8] }], d: 6 });
+await page.evaluate(() => {
+  const c = window.__caddy;
+  c.openDialog('pattern');
+  Object.assign(c.state.active.params, { ptype: 'Rectangular', what: 'Features', feats: ['h1'], layout: 'Spacing', dir1: 'X', n1: 3, d1: 15, dir2: 'Y', n2: 2, d2: 12 });
+  c.commit();
+});
+await save('pattern-grid');
+
 await browser.close();
 void cmd; void at;

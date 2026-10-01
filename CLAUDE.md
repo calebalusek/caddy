@@ -41,7 +41,12 @@ parts for **3D printing**. Built for the owner and other people to use.
     revolve for arcs), joined without merging away the section boundary lines (`keeps` discs in
     `unifyKeeping`); Mitered = trimmed at the bisector plane, Round = path corners replaced by true
     arcs sized by the prototype's rule (pivot about the corner when there is no room).
-    **Next: step 7 (Shell, Pattern), step 8 (Render view), step 9 (offline + publish).**
+  - **Step 7 done** (2026-10-01): Shell (`src/tools/shell.ts`, `src/kernel/shell.ts`: thick solid with
+    sharp corners, closed hollow via offset solid) and Pattern (`src/tools/pattern.ts`, copies in
+    `src/model/pattern.ts`; the kernel keeps every feature's tool shape in `toolCache` and a pattern
+    that moves the original suppresses it). Pattern copies that become new bodies use `bodyIds`
+    slots the tool creates on commit.
+    **Next: step 8 (Render view + 20 materials), step 9 (offline + publish), step 10 (Mirror, Overhang, Text, Thread).**
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised
