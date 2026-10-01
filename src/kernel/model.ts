@@ -1,7 +1,7 @@
 // Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
 // Runs wherever the kernel is loaded: the Web Worker in the app, Node in tests.
 import {
-  makeOffset, assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makePolygon, makeThreePointArc, makeVertex, revolution, measureArea, measureDistanceBetween, measureVolume, Vector,
+  genericSweep, makeHelix, getFont, Plane, sketchText, makeOffset, assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makePolygon, makeThreePointArc, makeVertex, revolution, measureArea, measureDistanceBetween, measureVolume, Vector,
   type Edge, type Face, type Shape3D, type Wire,
 } from 'replicad';
 import { toWorld, vadd, vcross, vdot, vlen, vnorm, vsc, vsub } from '../model/frames';
@@ -10,6 +10,7 @@ import type { P2 } from '../sketch/model';
 import { arcDelta } from '../sketch/profiles';
 import { matchEdge } from './match';
 import type { DraftResult, BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, FaceSpec, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
+import { DEPTH_K, grooveProfile, grooveSection, standardSize } from '../model/threads';
 import { patternRelocates, patternTransforms, type Xf } from '../model/pattern';
 import { Scope, tup } from './scope';
 import { thickSolid } from './shell';
@@ -197,7 +198,7 @@ function matchFace(shape: Shape3D, spec: FaceSpec, tags: Map<string, string>, sc
     const d = measureDistanceBetween(pt, f);
     if (d > 0.5) return;
     const fn = vnorm(tup(f.geomType === 'PLANE' ? f.normalAt() : f.normalAt(spec.p)));
-    if (vdot(fn, n) < 0.99) return;
+    if (f.geomType === 'PLANE' && vdot(fn, n) < 0.99) return;
     const score = d + (spec.surf && tags.get(signature(f)) === spec.surf ? 0 : 0.25);
     if (score < bd) { bd = score; best = f; }
   });
@@ -318,6 +319,85 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
         let k = 0;
         sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':w' + k++); });
         const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x', r.keeps);
+        if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'thread') {
+        const b = bodies.find((x) => x.id === st.face.bodyId);
+        if (!b || !b.shape) { res.error = true; res.note = 'its body is gone'; continue; }
+        const f = matchFace(b.shape, st.face, b.tags, sc);
+        if (!f) { res.error = true; res.note = 'its face is gone'; continue; }
+        if (f.geomType !== 'CYLINDRE') { res.error = true; res.note = 'threads go on round faces: a shaft or a hole'; continue; }
+        // the cylinder: axis, radius, which way it faces, and how far it reaches along the axis
+        const cyl = (f.surface as any).wrapped.Cylinder(), ax = cyl.Axis(), d0 = ax.Direction(), l0 = ax.Location();
+        const dir = vnorm([d0.X(), d0.Y(), d0.Z()] as Vec3), loc: Vec3 = [l0.X(), l0.Y(), l0.Z()], R = cyl.Radius();
+        [cyl, ax, d0, l0].forEach((o) => o.delete && o.delete());
+        const click = st.face.p, along = (q: Vec3): number => vdot(vsub(q, loc), dir);
+        const radial = vsub(vsub(click, loc), vsc(dir, along(click)));
+        const internal = vdot(vnorm(tup(f.normalAt(click))), radial) < 0;
+        const bb = f.boundingBox, [blo, bhi] = bb.bounds;
+        bb.delete();
+        let t0 = Infinity, t1 = -Infinity;
+        for (const x of [blo[0], bhi[0]]) for (const y of [blo[1], bhi[1]]) for (const z of [blo[2], bhi[2]]) { const t = along([x, y, z]); t0 = Math.min(t0, t); t1 = Math.max(t1, t); }
+        const faceLen = t1 - t0;
+        const std = standardSize(2 * R, internal), pitch = st.pitch > 0 ? st.pitch : std.pitch, depth = st.depth > 0 ? st.depth : DEPTH_K * pitch;
+        if (pitch < 0.1) { res.error = true; res.note = 'the pitch needs to be at least 0.1 mm'; continue; }
+        if (!internal && depth >= R) { res.error = true; res.note = 'the thread is deeper than the shaft is wide'; continue; }
+        const len = st.length > 0 ? Math.min(st.length, faceLen) : faceLen, full = len >= faceLen - 1e-6;
+        if (len < pitch) { res.error = true; res.note = 'the thread is shorter than one pitch'; continue; }
+        // start at the end of the face nearest the click, and run toward the other end
+        const fromLow = Math.abs(along(click) - t0) <= Math.abs(along(click) - t1), zdir: Vec3 = fromLow ? dir : vsc(dir, -1);
+        const origin = vadd(loc, vsc(dir, fromLow ? t0 : t1));
+        // the groove is swept along a helix around the Z axis, then moved onto the cylinder
+        const prof = grooveProfile(R, pitch, depth, internal).map(([r, z]) => [r, 0, z - pitch] as Vec3);
+        const spine = sc.add(makeHelix(pitch, len + (full ? 2 : 1) * pitch, R, [0, 0, -pitch], [0, 0, 1], st.hand === 'Left'));
+        const wire = sc.add(assembleWire(prof.map((p, i) => sc.add(makeLine(p, prof[(i + 1) % prof.length])))));
+        const sweep: Shape3D = keep(genericSweep(wire, spine, { frenet: true }));
+        const cr = vcross([0, 0, 1], zdir), sin = vlen(cr), cos = zdir[2];
+        const place = (turn: number): Shape3D => {
+          let g: Shape3D = turn ? keep(sweep.clone().rotate(turn, [0, 0, 0], [0, 0, 1])) : sweep;
+          if (sin > 1e-9) g = keep(g.clone().rotate((Math.atan2(sin, cos) * 180) / Math.PI, [0, 0, 0], vnorm(cr)));
+          else if (cos < 0) g = keep(g.clone().rotate(180, [0, 0, 0], [1, 0, 0]));
+          return keep(g.clone().translate(origin));
+        };
+        // The engine can fail to cut a helical groove without saying so, depending on how the seams line up.
+        // So the result is checked against the groove's swept volume, and tried again a little turned if it is off.
+        const g0 = grooveSection(R, pitch, depth, internal), expect = g0.area * 2 * Math.PI * g0.rho * (len / pitch);
+        const v0 = measureVolume(b.shape);
+        let out: Shape3D | null = null, groove: Shape3D = place(0);
+        for (const turn of [0, 0.31, 0.73, 1.37, 2.11, 3.9]) {
+          groove = place(turn);
+          try {
+            const cut = keep(b.shape.cut(groove)), removed = v0 - measureVolume(cut);
+            if (removed > (full ? 0.9 : 0.75) * expect && removed < (full ? 1.12 : 1.45) * expect) { out = cut; break; }
+          } catch { /* try the next angle */ }
+        }
+        if (!out) { res.error = true; res.note = 'the geometry engine could not cut this thread. Try a slightly different pitch, depth or length'; continue; }
+        res.box = boxOf(groove);
+        let k = 0;
+        b.tags = retag(out, b.tags, null, () => st.id + ':t' + k++, sc);
+        b.shape = out;
+        res.info = (internal ? 'Internal' : 'External') + ' thread, ' + (st.pitch > 0 ? '' : 'standard M' + std.nominal + ' coarse, ') + 'pitch ' + Math.round(pitch * 1000) / 1000 + ' mm';
+      } else if (st.kind === 'text') {
+        if (!st.frame) { res.error = true; res.note = 'its plane is gone'; continue; }
+        if (!st.text.trim()) { res.error = true; res.note = 'type the text'; continue; }
+        if (!(st.size > 0)) { res.error = true; res.note = 'the text size needs to be more than 0 mm'; continue; }
+        if (!(st.height > 0)) { res.error = true; res.note = 'the height needs to be more than 0 mm'; continue; }
+        if (!getFont(st.font)) { res.error = true; res.note = 'that font is not available'; continue; }
+        const fr = st.frame;
+        let raw: Shape3D = keep(sketchText(st.text, { fontSize: st.size, fontFamily: st.font, startX: 0, startY: 0 } as any, { plane: new Plane(fr.o, fr.u, fr.n) }).extrude(st.height) as Shape3D);
+        if (st.operation === 'Cut') raw = keep(raw.clone().translate(vsc(fr.n, -st.height))); // engraved: into the surface
+        // put the middle of the text on the anchor, then turn it about the anchor
+        const [lo, hi] = boxOf(raw);
+        const mid: Vec3 = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+        const dm = vsub(mid, fr.o), cu = vdot(dm, fr.u), cv = vdot(dm, fr.v);
+        const target = toWorld(fr, st.anchor[0], st.anchor[1]);
+        let tool: Shape3D = keep(raw.clone().translate(vadd(vsc(fr.u, st.anchor[0] - cu), vsc(fr.v, st.anchor[1] - cv))));
+        if (Math.abs(st.angle) > 1e-9) tool = keep(tool.clone().rotate(st.angle, target, fr.n));
+        const tbox = boxOf(tool);
+        res.box = tbox;
+        const toolTags = new Map<string, string>();
+        let k = 0;
+        sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':t' + k++); });
+        const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x');
         if (bad) { res.error = true; res.note = bad; }
       } else if (st.kind === 'mirror') {
         if (!st.plane) { res.error = true; res.note = 'its mirror plane is gone'; continue; }

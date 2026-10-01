@@ -11,6 +11,7 @@ import { finishSketch, lookAtSketch, startSketchPick } from '../sketch/session';
 import { setTool } from '../sketch/tools';
 import { openDialog } from '../tools/dialog';
 import { openPattern } from '../tools/pattern';
+import { openText } from '../tools/text';
 import { openMatPanel, setViewMode } from '../view/render';
 import { endPick } from '../tools/pick';
 import { message } from '../ui/message';
@@ -73,8 +74,9 @@ export const COMMANDS: Command[] = [
   C('extrude', 'Extrude', 'EX', 'solid', 'create', 'extrude', ['extrude', 'ext', 'pull', 'push', 'boss', 'pad', 'cut', 'pocket'], () => openDialog('extrude')),
   C('revolve', 'Revolve', 'REV', 'solid', 'create', 'revolve', ['revolve', 'lathe', 'spin', 'turn'], () => openDialog('revolve')),
   C('sweep', 'Sweep', 'SW', 'solid', 'create', 'sweep', ['sweep', 'pipe', 'tube', 'follow path', 'rail'], () => openDialog('sweep')),
+  C('text', 'Text', 'TXT', 'solid', 'create', 'text', ['text', 'emboss', 'engrave', 'label', 'letters', 'words'], () => openText()),
   C('hole', 'Hole', 'HO', 'solid', 'create', 'hole', ['hole', 'bore', 'drill', 'counterbore', 'countersink'], () => openDialog('hole')),
-  C('thread', 'Thread', 'TH', 'solid', 'create', 'thread', ['thread', 'screw', 'bolt', 'nut']),
+  C('thread', 'Thread', 'TH', 'solid', 'create', 'thread', ['thread', 'screw', 'bolt', 'nut'], () => openDialog('thread')),
   C('fillet', 'Fillet', 'F', 'solid', 'modify', 'fillet', ['fillet', 'round', 'radius', 'round edge'], () => openDialog('fillet')),
   C('chamfer', 'Chamfer', 'CHA', 'solid', 'modify', 'chamfer', ['chamfer', 'bevel', 'break edge'], () => openDialog('chamfer')),
   C('shell', 'Shell', 'SH', 'solid', 'modify', 'shell', ['shell', 'hollow'], () => openDialog('shell')),
@@ -89,7 +91,7 @@ export const COMMANDS: Command[] = [
   C('line', 'Line', 'L', 'sketch', 'sketch', 'line', ['line', 'polyline'], () => setTool('line'), { tool: 'line', starts: true }),
   C('rectangle', 'Rectangle', 'REC', 'sketch', 'sketch', 'rect', ['rectangle', 'box', 'square'], () => setTool('rect'), { tool: 'rect', starts: true }),
   C('circle', 'Circle', 'C', 'sketch', 'sketch', 'circle', ['circle'], () => setTool('circle'), { tool: 'circle', starts: true }),
-  C('stext', 'Text', 'TE', 'sketch', 'sketch', 'text', ['text', 'emboss', 'engrave', 'label']),
+  C('stext', 'Text', 'TE', 'sketch', 'sketch', 'text', ['text', 'emboss', 'engrave', 'label'], () => openText(state.sketch ? state.sketch.params.ref : null)),
   C('arc', 'Arc', 'A', 'sketch', 'sketch', 'arc', ['arc', 'curve', '3 point arc'], () => setTool('arc'), { tool: 'arc', starts: true }),
   C('polygon', 'Polygon', 'POL', 'sketch', 'sketch', 'polygon', ['polygon', 'hexagon', 'octagon', 'nut'], () => setTool('polygon'), { tool: 'polygon', starts: true }),
   C('trim', 'Trim', 'TR', 'sketch', 'modify', 'trim', ['trim', 'cut back', 'delete segment'], () => setTool('trim'), { tool: 'trim' }),

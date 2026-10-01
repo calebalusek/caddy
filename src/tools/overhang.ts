@@ -62,7 +62,7 @@ registerTool<OverhangParams>({
   noFeature: true,
   fields: [
     { key: 'angle', kind: 'length', label: 'Overhang angle (from vertical)', unit: '°', primary: true },
-    { key: 'bed', kind: 'chip', label: 'Face on the print bed', chipId: 'bedChip', act: 'pickBed', note: 'Most printers manage 45°. A flat ceiling is 90°. Pick a different bottom face to test another way of laying the part down.' },
+    { key: 'bed', kind: 'chip', label: 'Face on the print bed', chipId: 'bedChip', act: 'pickBed', note: 'Most printers manage 45°. A flat ceiling is 90°. Orbit under the part to see the red faces. Pick a different bottom face to test another way of laying the part down.' },
   ],
   defaults: () => ({ angle: 45, bed: null }),
   chips: (A: Dlg) => ({ bedChip: { picking: !!A.picking, set: !!A.params.bed, text: A.picking ? 'Click a flat face…' : A.params.bed ? 'A chosen face' : 'The model\'s own bottom (Z = 0)' } }),

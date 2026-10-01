@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import opencascade from 'replicad-opencascadejs';
+import { installFonts, type FontName } from '../../src/kernel/fonts';
 import { attachKernel, isKernelReady } from '../../src/kernel/ops';
 
 let loading: Promise<void> | null = null;
@@ -11,7 +12,9 @@ export function loadKernel(): Promise<void> {
   if (!loading) {
     const wasmPath = createRequire(import.meta.url).resolve('replicad-opencascadejs/wasm');
     const wasmBinary = readFileSync(wasmPath);
-    loading = (opencascade as (opts: object) => Promise<unknown>)({ wasmBinary }).then(attachKernel);
+    const require = createRequire(import.meta.url), file: Record<FontName, string> = { Barlow: '@fontsource/barlow/files/barlow-latin-500-normal.woff', 'Barlow Bold': '@fontsource/barlow/files/barlow-latin-700-normal.woff' };
+    const get = async (n: FontName): Promise<ArrayBuffer> => { const b = readFileSync(require.resolve(file[n])); return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer; };
+    loading = (opencascade as (opts: object) => Promise<unknown>)({ wasmBinary }).then(attachKernel).then(() => installFonts(get));
   }
   return loading;
 }

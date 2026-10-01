@@ -48,8 +48,6 @@ test.describe('app shell', () => {
     await page.keyboard.type('pl');
     await expect(page.locator('#sugs li').first()).toContainText('Offset plane');
     await page.keyboard.press('Escape');
-    await page.locator('.tbtn[data-cmd="thread"]').click();
-    await expect(page.locator('#msg')).toContainText("Thread isn't built yet");
     await typeCommand(page, 'top');
     await settle(page);
     const phi = await page.evaluate(() => (window as any).__caddy.cam.phi);

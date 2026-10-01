@@ -126,6 +126,16 @@ export function stepFor(features: Feature[], f: Feature): BuildStep | null {
     const path = sweepPath(features, P.path);
     return { kind: 'sweep', id: f.id, profile, face: P.face || null, path: path.path || null, pathNote: path.err, orientation: P.orientation === 'Parallel' ? 'Parallel' : 'Perpendicular', corners: P.corners === 'Mitered' ? 'Mitered' : 'Round', operation: P.operation, bodyId: f.bodyId || null };
   }
+  if (f.type === 'thread') {
+    const P = f.params as any;
+    return P.face ? { kind: 'thread', id: f.id, face: P.face, pitch: P.size === 'Custom' ? +P.pitch || 0 : 0, depth: +P.depth || 0, length: +P.length || 0, hand: P.hand === 'Left' ? 'Left' : 'Right' } : null;
+  }
+  if (f.type === 'text') {
+    const P = f.params as any, fr = resolveRefIn(features, P.ref);
+    // text on a flat face goes where the user clicked (the middle of that face's frame); on a plane, at its origin
+    const base: [number, number] = P.ref && P.ref.kind === 'face' && fr ? [(fr.ext[0] + fr.ext[1]) / 2, (fr.ext[2] + fr.ext[3]) / 2] : [0, 0];
+    return { kind: 'text', id: f.id, text: String(P.text ?? ''), font: String(P.font || 'Barlow Bold'), size: +P.size || 0, height: +P.height || 0, frame: fr, anchor: [base[0] + (+P.x || 0), base[1] + (+P.y || 0)], angle: +P.angle || 0, operation: P.operation || 'New body', bodyId: f.bodyId || null };
+  }
   if (f.type === 'mirror') {
     const P = f.params as any, fr = resolveRefIn(features, P.ref);
     return { kind: 'mirror', id: f.id, bodies: P.bodies || [], plane: fr ? { o: fr.o, n: fr.n } : null, operation: P.operation === 'Join' ? 'Join' : 'New body', bodyIds: (f.bodyIds as string[]) || [] };

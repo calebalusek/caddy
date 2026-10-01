@@ -1,10 +1,13 @@
 // Geometry worker: loads OpenCascade (WebAssembly) off the UI thread and answers requests.
 import opencascade from 'replicad-opencascadejs';
 import wasmUrl from 'replicad-opencascadejs/wasm?url';
+import barlowUrl from '@fontsource/barlow/files/barlow-latin-500-normal.woff?url';
+import barlowBoldUrl from '@fontsource/barlow/files/barlow-latin-700-normal.woff?url';
+import { installFonts, type FontName } from './fonts';
 import { attachKernel, buildDraft, buildModel, exportMeshes, exportStep, testBox } from './ops';
 import type { BodyMesh, BuildStep, KernelOps, KernelRequest, KernelResponse } from './protocol';
 
-const loading = (opencascade as (opts: object) => Promise<unknown>)({ locateFile: () => wasmUrl }).then(attachKernel);
+const loading = (opencascade as (opts: object) => Promise<unknown>)({ locateFile: () => wasmUrl }).then(attachKernel).then(() => installFonts((n: FontName) => fetch(n === 'Barlow' ? barlowUrl : barlowBoldUrl).then((r) => r.arrayBuffer())));
 
 const meshBuffers = (m: BodyMesh): Transferable[] => [m.positions.buffer, m.normals.buffer, m.indices.buffer, m.edgeLines.buffer];
 

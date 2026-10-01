@@ -20,7 +20,7 @@ import { endPick, ray } from './pick';
 
 export interface FieldDef<P> {
   key: string;
-  kind: 'length' | 'choice' | 'chip';
+  kind: 'length' | 'choice' | 'chip' | 'text';
   label: string;
   /** length: the box that gets focus when the menu opens. */
   primary?: boolean;
@@ -89,6 +89,8 @@ export interface ActiveDialog<P = any> {
   params: P;
   edit: Feature | null;
   note?: string;
+  /** Something the kernel reports about a preview that worked (a thread's size). */
+  info?: string;
   /** Reopened by Ctrl+Z: the timeline as it was before this feature's last change. Ctrl+Z again goes back to it. */
   undoBefore?: string;
 }
@@ -160,6 +162,8 @@ onFrame(() => {
 function fieldHTML<P>(f: FieldDef<P>, params: any, editing: boolean): string {
   if (f.kind === 'length')
     return `<div class="field" data-field="${f.key}"><label for="f-${f.key}">${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}" class="len-input${f.primary ? ' primary' : ''}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${fmt(params[f.key] || 0)}" aria-describedby="h-${f.key}"><span class="unit">${f.unit || 'mm'}</span></div><div class="fhint" id="h-${f.key}"></div></div>`;
+  if (f.kind === 'text')
+    return `<div class="field" data-field="${f.key}"><label for="f-${f.key}">${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}" class="txt-input" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="${esc(String(params[f.key] ?? ''))}" placeholder="${esc(f.note || '')}"></div></div>`;
   if (f.kind === 'choice') {
     const dis = editing && f.lockOnEdit ? ' disabled title="Fixed after the feature is created"' : '';
     return `<fieldset class="field" data-field="${f.key}"${dis}><legend>${f.label}</legend><div class="seg-row">${f.options!.map((o) => `<label><input type="radio" name="f-${f.key}" data-key="${f.key}" value="${o}"${params[f.key] === o ? ' checked' : ''}><span>${o}</span></label>`).join('')}</div>${f.hintId ? `<div class="auto-hint" id="${f.hintId}"></div>` : ''}</fieldset>`;
@@ -215,6 +219,7 @@ export function syncFields(): void {
   if (!A) return;
   A.def.fields.concat(A.def.advanced || []).forEach((f) => {
     if (f.kind === 'length') { const el = dialogEl.querySelector<HTMLInputElement>('#f-' + f.key); if (el) el.value = fmt(A.params[f.key] || 0); }
+    else if (f.kind === 'text') { const el = dialogEl.querySelector<HTMLInputElement>('#f-' + f.key); if (el) el.value = String(A.params[f.key] ?? ''); }
     else if (f.kind === 'choice') dialogEl.querySelectorAll<HTMLInputElement>(`input[name="f-${f.key}"]`).forEach((i) => { i.checked = i.value === A.params[f.key]; });
   });
   applyShowIf(); updateChips();
@@ -374,6 +379,7 @@ export function initDialogs(): void {
   dialogEl.addEventListener('input', (e) => {
     const t = e.target as HTMLInputElement;
     const A = state.active;
+    if (A && t.classList.contains('txt-input')) { A.params[t.dataset.key!] = t.value; updatePreview(); return; }
     if (!t.classList.contains('len-input') || !A) return;
     const v = parseExpr(t.value), hint = dialogEl.querySelector('#h-' + t.dataset.key)!;
     if (v === null) {

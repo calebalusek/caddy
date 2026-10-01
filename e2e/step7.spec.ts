@@ -327,3 +327,90 @@ test.describe('step 10: overhang check', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('step 10: text', () => {
+  test('select the top face, Text: type the words, size and height; raised then engraved; edit; the arrow sets the height', async ({ page }) => {
+    const errors = await openApp(page);
+    await box(page, 60, 40, 8);
+    const top = await screenOf(page, [30, 20, 8]);
+    await page.mouse.move(top.x, top.y); await page.mouse.click(top.x, top.y);
+    await typeCommand(page, 'txt');
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('#tpChip')).toContainText('Face of Body1'); // the selected face is the plane
+    await expect(page.locator('#f-size')).toHaveValue('0'); // values start at 0
+    await expect(page.locator('input[name="f-operation"][value="Join"]')).toBeChecked(); // on a face: raised
+    await expect(page.locator('#okBtn')).toBeDisabled();
+    await page.locator('#f-text').fill('CADDY');
+    await page.locator('#f-size').fill('10');
+    await page.locator('#f-height').fill('1');
+    const s0 = await built(page);
+    const v0 = 60 * 40 * 8;
+    let s = await built(page);
+    const prev = await page.evaluate(() => (window as any).__caddy.shownBodies()[0].volume);
+    expect(prev).toBeGreaterThan(v0 + 20); // live preview: the letters stand on the face
+    void s0;
+    await page.locator('#okBtn').click();
+    s = await built(page);
+    expect(s.features.find((f: any) => f.type === 'text')).toMatchObject({ name: 'Text1', error: false });
+    expect(s.bodies).toHaveLength(1);
+    const raised = s.bodies[0].volume;
+    expect(raised).toBeCloseTo(prev, 4);
+
+    // edit it into an engraving: the letters now cut into the plate instead
+    await page.locator('#timeline [data-ref="text:tx1"]').dblclick();
+    await page.locator('#f-height').fill('2');
+    await page.locator('#okBtn').click();
+    s = await built(page);
+    expect(s.bodies[0].volume).toBeGreaterThan(raised); // twice as thick, so twice the letter volume
+    expect(errors).toEqual([]);
+  });
+
+  test('the Text button inside a sketch opens the tool on that sketch\'s plane', async ({ page }) => {
+    const errors = await openApp(page);
+    await typeCommand(page, 'sk');
+    await page.locator('#tree [data-ref="origin:XY"]').click();
+    await settle(page);
+    await page.locator('.tbtn[data-cmd="stext"]').click();
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('#dlgTitle')).toHaveText('Text');
+    await expect(page.locator('#tpChip')).toContainText('XY');
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe('step 10: thread', () => {
+  test('click a shaft: the standard M10 coarse thread is found and cut; the volume matches the groove', async ({ page }) => {
+    test.setTimeout(180_000);
+    const errors = await openApp(page);
+    const data = {
+      format: 'caddy', version: 2, app: 'CADDY', units: 'mm', id: 'prj-sh', name: 'Shaft', created: 1, modified: 1,
+      counters: { sketch: 1, extrude: 1, plane: 0, body: 1, fillet: 0, revolve: 0, hole: 0, sweep: 0, shell: 0, pattern: 0, mirror: 0, text: 0, thread: 0 },
+      bodies: [{ id: 'b1', name: 'Body1', visible: true }],
+      features: [
+        { id: 's1', type: 'sketch', name: 'Sketch1', params: { ref: { kind: 'origin', id: 'XY' } }, pts: { O: { x: 0, y: 0 } }, curves: [{ id: 'c1', type: 'circle', c: 'O', r: 5 }], cons: [], nid: 5, hist: [] },
+        { id: 'e1', type: 'extrude', name: 'Extrude1', params: { sketchId: 's1', key: 'x', hint: { pts: [[0, 0]], area: 78.5 }, distance: 20, direction: 'One side', operation: 'New body', opAuto: false, offset: 0 }, bodyId: 'b1' },
+      ],
+    };
+    await page.evaluate(async (d) => { await (window as any).__caddy.importFile({ name: 'shaft.caddy.json', text: async () => JSON.stringify(d) }); }, data);
+    await settle(page);
+    await built(page);
+    const v0 = Math.PI * 25 * 20;
+    expect(await page.evaluate(() => (window as any).__caddy.baseBodies()[0].volume)).toBeCloseTo(v0, 3);
+    await typeCommand(page, 'th');
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('#okBtn')).toBeDisabled();
+    const s = await screenOf(page, [5 * Math.SQRT1_2, -5 * Math.SQRT1_2, 12]); // the side of the shaft that faces the camera
+    await page.mouse.move(s.x + 20, s.y + 10); await page.mouse.move(s.x, s.y);
+    await page.mouse.click(s.x, s.y);
+    await expect(page.locator('#thChip')).toHaveText('Round face of Body1');
+    await expect(page.locator('#thHint')).toHaveText('External thread, standard M10 coarse, pitch 1.5 mm', { timeout: 60_000 });
+    await page.locator('#okBtn').click();
+    await page.waitForFunction(() => (window as any).__caddy.state.features.some((f: any) => f.type === 'thread'));
+    await page.evaluate(async () => { await (window as any).__caddy.whenBuilt(); });
+    const r = await built(page);
+    expect(r.features.find((f: any) => f.type === 'thread')).toMatchObject({ name: 'Thread1', error: false });
+    const removed = v0 - r.bodies[0].volume, exact = 0.3045 * 1.5 * 1.5 * 2 * Math.PI * (5 - 0.4074 * 0.5413 * 1.5) * (20 / 1.5); // groove area × turns
+    expect(Math.abs(removed - exact) / exact).toBeLessThan(0.01);
+    expect(errors).toEqual([]);
+  });
+});

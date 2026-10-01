@@ -31,6 +31,8 @@ Progress notes
   (screenshots in `docs/checkpoint-3/`).
 - Step 7 done: Shell (inside/outside/closed hollow) and Pattern (rectangular, fit to edges, circular, bodies).
 - Step 8 done: Render view and 20 materials (screenshots in `docs/checkpoint-5/`).
+- Steps 9 and 10 done: published on GitHub Pages; Mirror, Overhang check, Text and Thread built
+  (screenshots in `docs/checkpoint-6/`).
 - Measured: the geometry engine is a 23 MB download (7.3 MB compressed), loaded once in the
   background, then cached.
 

@@ -73,6 +73,34 @@ export type BuildStep =
       direction: 'Inside' | 'Outside';
     }
   | {
+      kind: 'thread';
+      id: string;
+      /** The cylindrical face (a shaft or a hole) and where it was clicked: the thread starts at the end nearest that spot. */
+      face: FaceSpec;
+      /** 0 = the standard coarse pitch for this diameter. */
+      pitch: number;
+      /** 0 = the standard thread depth for the pitch. */
+      depth: number;
+      /** 0 = the whole face. */
+      length: number;
+      hand: 'Right' | 'Left';
+    }
+  | {
+      kind: 'text';
+      id: string;
+      text: string;
+      font: string;
+      /** Height of the letters (the font size), in mm, and how far they stand out of (or cut into) the plane. */
+      size: number;
+      height: number;
+      /** The plane the text lies on, where its middle goes (in the plane's own coordinates), and how far it is turned (degrees). */
+      frame: Frame | null;
+      anchor: [number, number];
+      angle: number;
+      operation: Operation;
+      bodyId: string | null;
+    }
+  | {
       kind: 'mirror';
       id: string;
       /** Bodies to mirror. */
@@ -160,7 +188,7 @@ export interface BodyResult {
   box: [Vec3, Vec3];
 }
 
-export interface StepResult { id: string; error?: boolean; note?: string; box?: [Vec3, Vec3] }
+export interface StepResult { id: string; error?: boolean; note?: string; box?: [Vec3, Vec3]; /** Something worth telling the user about a step that worked (a thread's size). */ info?: string }
 export interface BuildResult { bodies: BodyResult[]; steps: StepResult[] }
 
 /** A tool's live preview: the model as it is, the model with the tool applied, and what the tool takes away and adds. */

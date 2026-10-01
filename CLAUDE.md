@@ -55,7 +55,17 @@ parts for **3D printing**. Built for the owner and other people to use.
     manifest + icon, About/licenses page (`public/licenses.html`, LGPL notice), GitHub Pages workflow
     (`.github/workflows/pages.yml`), offline test (`e2e/offline.spec.ts`). **Not published yet**: waiting
     for the owner's GitHub repository.
-    **Next: publish (step 9), then step 10 (Mirror, Overhang, Text, Thread).**
+  - **Step 9 done**: published at https://calebalusek.github.io/caddy/ (GitHub Pages, repo
+    calebalusek/caddy; pushes to main redeploy). The owner pushes (git needs their sign-in).
+  - **Step 10 done** (2026-10-01): Mirror (`tools/mirror.ts`), Overhang check (`model/overhang.ts`,
+    `tools/overhang.ts`, a view with no History entry: `noFeature`), Text (`tools/text.ts`; fonts
+    bundled in `kernel/fonts.ts`; the sketch Text button opens it on the sketch's plane) and Thread
+    (`tools/thread.ts`, `model/threads.ts`; real helical groove, ISO 60° profile, standard coarse sizes).
+    Thread lesson: the engine sometimes cuts a helical groove wrongly without an error, so the kernel
+    checks the removed volume against the groove's swept volume and retries slightly turned.
+    Threads take ~3 s to build (they are rebuilt with every timeline change).
+    **All planned tools are rebuilt.** Next: whatever the owner asks for; open items are the license choice
+    and the real Windows Save As check.
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised

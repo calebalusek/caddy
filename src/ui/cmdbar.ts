@@ -95,7 +95,7 @@ export const isCommandInput = (el: EventTarget | null): boolean => el === cmdInp
 // ---- toolbar ----
 type Group = [label: string, color: string, ids: string[]];
 const SOLID_GROUPS: Group[] = [
-  ['Create', 'create', ['sketch', 'extrude', 'revolve', 'sweep', 'hole', 'thread']],
+  ['Create', 'create', ['sketch', 'extrude', 'revolve', 'sweep', 'hole', 'text', 'thread']],
   ['Modify', 'modify', ['fillet', 'chamfer', 'shell', 'patrect', 'mirror']],
   ['Construct', 'construct', ['plane']],
   ['Look', 'print', ['appearance', 'renderview']],

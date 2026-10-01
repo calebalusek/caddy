@@ -71,7 +71,7 @@ async function buildOnce(): Promise<void> {
     shown = baseRes;
     draftShown = out && draft ? out.draft.bodies : null;
     baseRes.steps.forEach((s) => { const f = featById(s.id); if (f) { f.error = !!s.error; f.note = s.note || ''; } });
-    if (A && state.active === A) A.note = out && draft ? out.draft.step.note || '' : '';
+    if (A && state.active === A) { A.note = out && draft ? out.draft.step.note || '' : ''; A.info = out && draft ? out.draft.step.info || '' : ''; }
     if (!sameBase) {
       state.selection = state.selection.filter((s) => s.kind === 'plane'); // face and edge ids are new after a rebuild
       clearBodyHighlights();
