@@ -19,6 +19,19 @@ parts for **3D printing**. Built for the owner and other people to use.
 - The prototype is the **behavioral blueprint**. The job now is to rebuild CADDY properly on a real
   geometry kernel while matching (and improving on) everything the prototype does.
 
+- The rebuild follows `docs/PLAN.md` (approved 2026-09-30). **Step 0 (setup) is done**: Vite +
+  TypeScript, replicad/OpenCascade in a Web Worker (`src/kernel/`), three.js display, tests.
+  Update this line as steps finish.
+
+## Commands
+- `npm run dev` — run the app at http://localhost:5173
+- `npm test` — geometry tests (real kernel in Node, exact numbers)
+- `npm run test:ui` — Playwright in installed Chrome with real WebGL
+- `npm run build` — typecheck + production build into `dist/`
+- Node and Git were installed with winget; a fresh shell may need
+  `C:\Program Files\nodejs` and `C:\Program Files\Git\cmd` on PATH.
+- Commit after each working step. Git is local for now; a GitHub repo is planned.
+
 ## Target architecture (agreed)
 - **TypeScript + Vite**, static site (host on GitHub Pages / Netlify / Cloudflare Pages), installable
   PWA that works offline after first load.
