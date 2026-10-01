@@ -20,6 +20,10 @@ Each step ends with tests passing and a git commit.
 | 9 | Offline install + publish | Installable PWA, hosted on a static host (GitHub planned). |
 | 10 | Placeholders | Mirror, Overhang check, Text, Thread — order chosen by the owner. |
 
+Progress notes
+- Step 0 done. Step 1 done; **Offset plane moved up from step 5 into step 1** so the tool-menu
+  system and plane picking could be tested with a real tool.
+
 ## Testing
 - **Geometry**: every line in `ACCEPTANCE-TESTS.md` is an automated test comparing the kernel's exact
   volume to the formula. Exports are re-read and checked for volume and watertightness.

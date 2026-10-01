@@ -1,23 +1,102 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CADDY</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧊</text></svg>" />
-  </head>
-  <body>
-    <div id="app">
-      <canvas id="viewport"></canvas>
-      <div id="loading" role="status">
-        <div class="loading-card">
-          <div class="loading-logo">🧊 CADDY</div>
-          <div class="loading-text">Loading the geometry engine…</div>
-          <div class="loading-bar"><span></span></div>
-        </div>
-      </div>
-      <div id="status" role="status"></div>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CADDY</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧊</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path class="b2" d="M12 12l8-4.5v9L12 21z"/><path class="b1" d="M12 3l8 4.5-8 4.5-8-4.5z"/><path class="b3" d="M4 7.5v9L12 21V12"/></svg>CADDY</div>
+  <button class="filebtn" id="fileBtn" aria-haspopup="menu">File</button>
+  <button class="docname" id="docName">Untitled part</button>
+  <span class="savestate" id="saveState" aria-live="polite"></span><span class="kstate" id="kernelState" role="status" hidden></span>
+  <span class="spacer"></span>
+  <span class="devnote" id="devNote">iPad mode: placeholder</span>
+  <div class="devswitch" id="devSwitch" role="group" aria-label="Device mode">
+    <button type="button" data-device="desktop" aria-pressed="true" title="Desktop mode: mouse and keyboard"></button>
+    <button type="button" data-device="tablet" aria-pressed="false" title="iPad mode: touch and Apple Pencil (coming later)"></button>
+  </div>
+  <span class="chip">mm</span>
+  <button class="iconbtn" id="themeBtn" aria-label="Switch light or dark theme" title="Switch theme"></button>
+</header>
+
+<nav class="toolbar" id="toolbar" aria-label="Tools"></nav>
+
+<main class="workspace">
+  <aside class="browser" aria-label="Browser">
+    <h2>Browser</h2>
+    <div id="tree"></div>
+  </aside>
+  <div class="viewport" id="viewport">
+    <section class="start" id="start" aria-labelledby="startTitle">
+      <h2 id="startTitle">Try it</h2>
+      <ol>
+        <li>Type <kbd>sk</kbd> and click the XY plane</li>
+        <li>Type <kbd>rec</kbd>, click a corner, then <kbd>60</kbd> <kbd>Tab</kbd> <kbd>40</kbd> <kbd>Enter</kbd></li>
+        <li>Draw a circle with <kbd>c</kbd>, then <kbd>d</kbd>: click it, or two points, or two lines for an angle. Double-click a dimension to change it live; <kbd>Tab</kbd> jumps to the next</li>
+        <li><kbd>fs</kbd>, then <kbd>ex</kbd> <kbd>8</kbd> <kbd>Enter</kbd> for a plate with a hole</li>
+        <li>Sketch on the top face and extrude downward: it switches to <b>Cut</b> automatically</li>
+      </ol>
+      <button class="iconbtn x" id="startClose" aria-label="Close tips"></button>
+    </section>
+    <button class="dim" id="dim" type="button" aria-label="Edit value"></button>
+    <div class="pick-tip" id="pickTip" aria-hidden="true"></div>
+    <div class="snap" id="snap" aria-hidden="true"></div>
+    <div class="hud" id="hud"></div>
+    <div class="skov" id="skOverlay"></div>
+    <div class="dimedit" id="dimEdit"><input id="dimInput" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Dimension value"></div>
+    <div class="views" role="group" aria-label="Views"></div>
+    <div class="rmode" id="rmode" role="group" aria-label="View style">
+      <button data-m="design" aria-pressed="true" title="Matte model with every edge shown (DV)">Design</button>
+      <button data-m="render" aria-pressed="false" title="Realistic materials and lighting (RV)">Render</button>
+      <span class="rsep"></span>
+      <button class="rx" data-r="mat" aria-pressed="false" title="Choose materials (AP)">Materials</button>
+      <button class="rx" data-r="edges" aria-pressed="true" title="Show or hide edges in the render view">Edges</button>
     </div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+    <section class="matpanel" id="matPanel" hidden aria-labelledby="matTitle">
+      <div class="dhead g-print"><svg viewBox="0 0 24 24" class="i" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M8.5 9.5a4 4 0 0 1 4-2"/><path d="M4 12h16"/></svg><h2 id="matTitle">Materials</h2>
+        <button class="iconbtn" data-mp="close" aria-label="Close materials"><svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <div class="mp-target"><span>Apply to</span><div class="selchip" id="mpTarget"></div><button class="btn" data-mp="all">All</button></div>
+      <div id="mpBody"></div>
+      <div class="mp-foot">Click a body in the view to choose which one gets the material. Materials save with the project.</div>
+    </section>
+    <div class="viewcube" id="viewCube"><button class="vc-home" id="vcHome" title="Home view (HOME)" aria-label="Home view"></button><canvas id="vcCanvas" aria-label="View cube: click a face, edge or corner"></canvas></div>
+    <div class="vhint">Drag to orbit, right-drag to pan, scroll to zoom</div>
+  </div>
+</main>
+
+<footer>
+  <div class="timeline">
+    <span class="tl-label">History</span>
+    <ol id="timeline"></ol>
+    <span class="tl-hint">Double-click to edit, right-click for more</span>
+  </div>
+  <div class="cmd">
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    <div class="cmdrow">
+      <span class="prompt" id="prompt">Command</span>
+      <input id="cmdInput" type="text" autocomplete="off" spellcheck="false" aria-label="Command" aria-autocomplete="list" aria-controls="sugs">
+    </div>
+  </div>
+  <ul class="sugs" id="sugs" role="listbox" aria-label="Command suggestions"></ul>
+</footer>
+
+<div class="ctx" id="ctx" role="menu" aria-label="Actions"></div>
+<div class="renamer" id="renamer"><input id="renameInput" aria-label="New name" autocomplete="off" spellcheck="false"></div>
+<div class="lib" id="lib" hidden role="dialog" aria-modal="true" aria-labelledby="libTitle">
+  <div class="lib-panel">
+    <div class="lib-head"><h2 id="libTitle">Projects</h2><span class="spacer"></span>
+      <button class="btn" data-lib="open"><svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6H9l2 2h7.5A1.5 1.5 0 0 1 20 9.5V11"/><path d="M3 19l3-8h16l-3 8z"/></svg>Open file…</button>
+      <button class="btn primary" data-lib="new"><svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>New project</button>
+      <button class="iconbtn" data-lib="close" aria-label="Close projects"><svg viewBox="0 0 24 24" class="i" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="lib-grid" id="libGrid"></div>
+    <div class="lib-foot">Projects save automatically in this browser as you work. Use File › Save to file for a backup or to move a project to another computer.</div>
+  </div>
+</div>
+<input type="file" id="fileIn" accept=".caddy,.json,application/json" hidden>
+<script type="module" src="/src/main.ts"></script>
+</body>
 </html>

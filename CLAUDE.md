@@ -19,9 +19,23 @@ parts for **3D printing**. Built for the owner and other people to use.
 - The prototype is the **behavioral blueprint**. The job now is to rebuild CADDY properly on a real
   geometry kernel while matching (and improving on) everything the prototype does.
 
-- The rebuild follows `docs/PLAN.md` (approved 2026-09-30). **Step 0 (setup) is done**: Vite +
-  TypeScript, replicad/OpenCascade in a Web Worker (`src/kernel/`), three.js display, tests.
-  Update this line as steps finish.
+- The rebuild follows `docs/PLAN.md` (approved 2026-09-30). Update this list as steps finish.
+  - **Step 0 done**: Vite + TypeScript, replicad/OpenCascade in a Web Worker (`src/kernel/`), tests.
+  - **Step 1 done**: app shell (`src/ui/`, `src/view/`), shared tool-menu system
+    (`src/tools/dialog.ts`, `src/ui/panel.ts`), plane picking, Offset plane as the first tool.
+- Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
+
+## How the rebuild is organised
+- `src/model/` plain data + math (no three.js, no DOM) so it runs in Node tests and the worker.
+- `src/app/` state, commands, regenerate (timeline rebuild), history (delete/undo/new).
+- `src/tools/` one file per tool; each registers a `ToolDef` with `registerTool` and gets the menu,
+  docking, value-starts-at-0, drag arrow, Enter/Esc for free.
+- `src/view/` three.js scene. It keeps the prototype's r128 color pipeline on purpose
+  (`ColorManagement` off, light intensities × π) so the approved Design-view look is identical.
+- `src/styles/app.css` is the prototype's CSS; rebuild-only rules go at the bottom.
+- Deliberate differences from the prototype: hovering a plane is orange (rule 1; the prototype used
+  blue), the toolbar button stays lit only while its tool is open, the Origin group opens by itself
+  while a tool asks for a plane, the geometry engine loads in the background.
 
 ## Commands
 - `npm run dev` — run the app at http://localhost:5173
