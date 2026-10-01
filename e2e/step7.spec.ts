@@ -259,3 +259,36 @@ test.describe('owner feedback round 2: live preview while the arrow is held', ()
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('step 10: mirror', () => {
+  test('one body is picked for you; pick the YZ plane in the Browser; New body then Join; Ctrl+Z reopens it', async ({ page }) => {
+    const errors = await openApp(page);
+    await box(page, 60, 40, 8);
+    await typeCommand(page, 'mi');
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('#mbChip')).toHaveText('Body1'); // the only body is picked for you
+    await expect(page.locator('#mpChip')).toHaveClass(/picking/); // and the plane is asked for next
+    await expect(page.locator('#okBtn')).toBeDisabled();
+    await page.locator('#tree [data-ref="origin:YZ"]').click();
+    await expect(page.locator('#mpChip')).toHaveText('YZ plane');
+    let s = await built(page);
+    const prev = await page.evaluate(() => (window as any).__caddy.shownBodies().map((b: any) => b.id));
+    expect(prev).toHaveLength(2); // live: the copy appears
+    await page.locator('#okBtn').click();
+    s = await built(page);
+    expect(s.bodies).toHaveLength(2);
+    s.bodies.forEach((b: any) => expect(b.volume).toBeCloseTo(60 * 40 * 8, 4));
+    expect(s.features.find((f: any) => f.type === 'mirror')).toMatchObject({ name: 'Mirror1', error: false });
+
+    // Ctrl+Z reopens it; mirror across the plane through the body's own right face to join them
+    await page.keyboard.press('Control+z');
+    await expect(dialog(page)).toBeVisible();
+    await page.locator('input[name="f-operation"][value="Join"]').check({ force: true });
+    s = await built(page);
+    await page.locator('#okBtn').click();
+    s = await built(page);
+    expect(s.bodies).toHaveLength(1);
+    expect(s.bodies[0].volume).toBeCloseTo(2 * 60 * 40 * 8, 4); // one part, symmetric about the plane
+    expect(errors).toEqual([]);
+  });
+});

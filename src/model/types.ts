@@ -55,7 +55,7 @@ export interface SketchFeature extends FeatureBase, SketchData {
 
 /** Feature types whose tools are rebuilt in later steps keep their saved parameters untouched. */
 export interface OtherFeature extends FeatureBase {
-  type: 'extrude' | 'fillet' | 'revolve' | 'hole' | 'sweep' | 'shell' | 'pattern';
+  type: 'extrude' | 'fillet' | 'revolve' | 'hole' | 'sweep' | 'shell' | 'pattern' | 'mirror' | 'text' | 'thread';
   params: Record<string, unknown>;
   bodyId?: string;
   bodyIds?: string[];
@@ -72,6 +72,6 @@ export interface Body {
   appearance?: unknown;
 }
 
-export type Counters = Record<'sketch' | 'extrude' | 'plane' | 'body' | 'fillet' | 'revolve' | 'hole' | 'sweep' | 'shell' | 'pattern', number>;
+export type Counters = Record<'sketch' | 'extrude' | 'plane' | 'body' | 'fillet' | 'revolve' | 'hole' | 'sweep' | 'shell' | 'pattern' | 'mirror' | 'text' | 'thread', number>;
 
-export const newCounters = (): Counters => ({ sketch: 0, extrude: 0, plane: 0, body: 0, fillet: 0, revolve: 0, hole: 0, sweep: 0, shell: 0, pattern: 0 });
+export const newCounters = (): Counters => ({ sketch: 0, extrude: 0, plane: 0, body: 0, fillet: 0, revolve: 0, hole: 0, sweep: 0, shell: 0, pattern: 0, mirror: 0, text: 0, thread: 0 });

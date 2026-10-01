@@ -73,6 +73,18 @@ export type BuildStep =
       direction: 'Inside' | 'Outside';
     }
   | {
+      kind: 'mirror';
+      id: string;
+      /** Bodies to mirror. */
+      bodies: string[];
+      /** The mirror plane: a point on it and its normal. */
+      plane: { o: Vec3; n: Vec3 } | null;
+      /** Join: the mirror image is fused to its body (a symmetric part). New body: a separate copy. */
+      operation: 'Join' | 'New body';
+      /** The bodies the copies become when they are separate. */
+      bodyIds: string[];
+    }
+  | {
       kind: 'pattern';
       id: string;
       params: PatternParams;

@@ -126,6 +126,10 @@ export function stepFor(features: Feature[], f: Feature): BuildStep | null {
     const path = sweepPath(features, P.path);
     return { kind: 'sweep', id: f.id, profile, face: P.face || null, path: path.path || null, pathNote: path.err, orientation: P.orientation === 'Parallel' ? 'Parallel' : 'Perpendicular', corners: P.corners === 'Mitered' ? 'Mitered' : 'Round', operation: P.operation, bodyId: f.bodyId || null };
   }
+  if (f.type === 'mirror') {
+    const P = f.params as any, fr = resolveRefIn(features, P.ref);
+    return { kind: 'mirror', id: f.id, bodies: P.bodies || [], plane: fr ? { o: fr.o, n: fr.n } : null, operation: P.operation === 'Join' ? 'Join' : 'New body', bodyIds: (f.bodyIds as string[]) || [] };
+  }
   if (f.type === 'pattern') {
     const P = f.params as any;
     return { kind: 'pattern', id: f.id, params: { ...DEFAULT_PATTERN, ...P, feats: P.feats || [], bodies: P.bodies || [] }, bodyIds: (f.bodyIds as string[]) || [] };

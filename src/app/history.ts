@@ -25,6 +25,9 @@ export function collectWithDependents(roots: Feature[]): Feature[] {
     const r = p && p.ref;
     const usesSketch = p && (ids.has(p.sketchId) || (p.path && ids.has(p.path.sketchId)) || (p.axis && ids.has(p.axis.sketchId)) || (Array.isArray(p.pts) && p.pts.some((q: any) => q.sketchId && ids.has(q.sketchId))));
     if (g.type === 'pattern' && (p.feats || []).some((id: string) => ids.has(id))) { ids.add(g.id); list.push(g); return; }
+    // copies of a body (mirror, pattern of bodies) depend on the features that make that body
+    const made = new Set(list.flatMap(bodyIdsOf));
+    if ((g.type === 'mirror' || g.type === 'pattern') && (p.bodies || []).some((id: string) => made.has(id))) { ids.add(g.id); list.push(g); return; }
     if (((g.type === 'extrude' || g.type === 'revolve' || g.type === 'hole' || g.type === 'sweep') && usesSketch) || (r && r.kind === 'plane' && ids.has(r.id))) { ids.add(g.id); list.push(g); }
   });
   return list;

@@ -80,7 +80,7 @@ export const COMMANDS: Command[] = [
   C('shell', 'Shell', 'SH', 'solid', 'modify', 'shell', ['shell', 'hollow'], () => openDialog('shell')),
   C('patrect', 'Rectangular pattern', 'PTR', 'solid', 'modify', 'pattern', ['pattern', 'array', 'grid'], () => openPattern('Rectangular')),
   C('patcirc', 'Circular pattern', 'PTC', 'solid', 'modify', 'pattern', ['pattern', 'polar array', 'circular', 'bolt circle'], () => openPattern('Circular')),
-  C('mirror', 'Mirror', 'MI', 'solid', 'modify', 'mirror', ['mirror', 'flip', 'symmetry']),
+  C('mirror', 'Mirror', 'MI', 'solid', 'modify', 'mirror', ['mirror', 'flip', 'symmetry'], () => openDialog('mirror')),
   C('plane', 'Offset plane', 'PL', 'solid', 'construct', 'plane', ['plane', 'construction plane', 'work plane', 'offset plane', 'datum'], () => openDialog('plane')),
   C('overhang', 'Overhang check', 'OV', 'solid', 'print', 'overhang', ['overhang', 'support', 'printability']),
   C('stl', 'Export STL', 'STL', 'solid', 'print', 'export', ['export', 'stl', 'save mesh', 'print file'], () => openSaveWindow('export', 'stl')),

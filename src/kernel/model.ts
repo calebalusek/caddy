@@ -319,6 +319,29 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
         sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':w' + k++); });
         const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x', r.keeps);
         if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'mirror') {
+        if (!st.plane) { res.error = true; res.note = 'its mirror plane is gone'; continue; }
+        if (!st.bodies.length) { res.error = true; res.note = 'click a body to mirror'; continue; }
+        const { o, n } = st.plane;
+        let slot = 0, gone = 0, short = 0;
+        st.bodies.forEach((id) => {
+          const b = bodies.find((x) => x.id === id);
+          if (!b || !b.shape) { gone++; return; }
+          const copy = keep(b.shape.clone().mirror(n, o) as Shape3D);
+          const a = sc.all(b.shape.faces), c = sc.all(copy.faces), tags = new Map<string, string>();
+          if (a.length === c.length) a.forEach((f, i) => { const t = b.tags.get(signature(f)); if (t) tags.set(signature(c[i]), st.id + '|' + t); });
+          if (st.operation === 'Join') {
+            const out = keep(b.keeps.length ? unifyKeeping(sc.add(rawBoolean('fuse', b.shape, copy)), b.keeps, sc) : b.shape.fuse(copy));
+            b.tags = retag(out, b.tags, tags, () => st.id + ':m', sc); b.shape = out;
+          } else {
+            const nid = st.bodyIds[slot++];
+            if (!nid) { short++; return; }
+            const nb = body(nid);
+            nb.shape = copy; nb.tags = tags; nb.keeps = [];
+          }
+        });
+        if (gone) { res.error = true; res.note = gone === st.bodies.length ? 'its bodies are gone' : gone + ' of its bodies are gone'; }
+        else if (short) { res.error = true; res.note = 'its new bodies are not set up yet'; }
       } else if (st.kind === 'pattern') {
         const P = st.params;
         const centerOf = (s: Shape3D): Vec3 => { const [lo, hi] = boxOf(s); return [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2]; };

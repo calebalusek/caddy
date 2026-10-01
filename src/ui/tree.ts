@@ -50,7 +50,7 @@ function ctxItems(ref: string): MenuItem[] {
   else if (kind === 'extrude') { const cut = (f.params as any).operation === 'Cut'; items.push({ label: 'Edit ' + (cut ? 'cut' : 'extrude'), icon: cut ? 'cut' : 'extrude', act: () => editRef(ref) }); }
   items.push({ label: 'Rename', icon: 'rename', act: () => startRename(ref) });
   if (kind === 'fillet') { const k = String((f.params as any).kind || 'fillet'); items.push({ label: 'Edit ' + k, icon: k, act: () => editRef(ref) }); }
-  if (['revolve', 'hole', 'sweep', 'shell', 'pattern'].includes(kind)) items.push({ label: 'Edit ' + kind, icon: kind, act: () => editRef(ref) });
+  if (['revolve', 'hole', 'sweep', 'shell', 'pattern', 'mirror', 'text', 'thread'].includes(kind)) items.push({ label: 'Edit ' + kind, icon: kind, act: () => editRef(ref) });
   if (kind === 'sketch' || kind === 'plane') items.push({ label: f.visible === false ? 'Show' : 'Hide', icon: f.visible === false ? 'eye' : 'eyeoff', act: () => toggleVis(ref) });
   items.push({ sep: true }, { label: 'Delete', icon: 'trash', danger: true, act: () => deleteFeature(f) });
   return items;
@@ -114,6 +114,9 @@ function tip(f: Feature): string {
     case 'sketch': return f.name;
     case 'shell': return `${f.name}: ${fmt(p.thickness)} mm walls`;
     case 'pattern': return `${f.name}: ${String(p.ptype).toLowerCase()} pattern`;
+    case 'mirror': return `${f.name}: ${(p.bodies || []).length} bod${(p.bodies || []).length === 1 ? 'y' : 'ies'} mirrored`;
+    case 'text': return `${f.name}: "${String(p.text).slice(0, 24)}"`;
+    case 'thread': return `${f.name}: ${p.kind === 'Internal' ? 'internal' : 'external'} thread, ${fmt(p.pitch)} mm pitch`;
     case 'sweep': return `${f.name} along a path`;
     case 'revolve': return `${f.name}, ${fmt(Math.abs(p.angle))}°`;
     case 'hole': return `${f.name}, Ø${fmt(p.d)} mm`;
