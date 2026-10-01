@@ -28,6 +28,7 @@ import './tools/sweep';
 import './tools/shell';
 import './tools/pattern';
 import './tools/mirror';
+import './tools/overhang';
 import { initChrome } from './ui/chrome';
 import { initCommandBar } from './ui/cmdbar';
 import { initKeyboard } from './ui/keyboard';

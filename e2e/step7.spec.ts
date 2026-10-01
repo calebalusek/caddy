@@ -292,3 +292,38 @@ test.describe('step 10: mirror', () => {
     expect(errors).toEqual([]);
   });
 });
+
+test.describe('step 10: overhang check', () => {
+  test('paints the ledges of a T-shaped part (400 mm²), changes with the angle, leaves no History entry, and clears on close', async ({ page }) => {
+    const errors = await openApp(page);
+    // a T section on the Front plane (stem 20 wide, bar 40 wide, 10 high each), 20 mm long
+    const P: [string, number, number][] = [['p1', 10, 0], ['p2', 30, 0], ['p3', 30, 10], ['p4', 40, 10], ['p5', 40, 20], ['p6', 0, 20], ['p7', 0, 10], ['p8', 10, 10]];
+    const names = P.map((p) => p[0]);
+    const data = {
+      format: 'caddy', version: 2, app: 'CADDY', units: 'mm', id: 'prj-t', name: 'T part', created: 1, modified: 1,
+      counters: { sketch: 1, extrude: 1, plane: 0, body: 1, fillet: 0, revolve: 0, hole: 0, sweep: 0, shell: 0, pattern: 0, mirror: 0, text: 0, thread: 0 },
+      bodies: [{ id: 'b1', name: 'Body1', visible: true }],
+      features: [
+        { id: 's1', type: 'sketch', name: 'Sketch1', params: { ref: { kind: 'origin', id: 'XZ' } }, pts: { O: { x: 0, y: 0 }, ...Object.fromEntries(P.map(([n, x, y]) => [n, { x, y }])) }, curves: names.map((n, i) => ({ id: 'l' + (i + 1), type: 'line', p1: n, p2: names[(i + 1) % names.length] })), cons: [], nid: 20, hist: [] },
+        { id: 'e1', type: 'extrude', name: 'Extrude1', params: { sketchId: 's1', key: 'x', hint: { pts: [[20, 5]], area: 600 }, distance: 20, direction: 'One side', operation: 'New body', opAuto: false, offset: 0 }, bodyId: 'b1' },
+      ],
+    };
+    await page.evaluate(async (d) => { await (window as any).__caddy.importFile({ name: 'T.caddy.json', text: async () => JSON.stringify(d) }); }, data);
+    await settle(page);
+    await built(page);
+    expect(await page.evaluate(() => (window as any).__caddy.baseBodies()[0].volume)).toBeCloseTo(600 * 20, 4); // 20 x 10 stem plus 40 x 10 bar, 20 long
+    await typeCommand(page, 'ov');
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('#f-angle')).toHaveValue('45'); // the usual printer limit
+    await expect(page.locator('#h-angle')).toContainText('400 mm²');
+    await page.locator('#f-angle').fill('91');
+    await expect(page.locator('#h-angle')).toContainText('Nothing needs support');
+    await page.locator('#f-angle').fill('45');
+    const historyBefore = await page.evaluate(() => (window as any).__caddy.state.features.length);
+    await page.locator('#okBtn').click();
+    expect(await page.evaluate(() => (window as any).__caddy.state.features.length)).toBe(historyBefore); // a view, not a feature
+    await page.keyboard.press('Control+z'); // nothing to undo: the model is untouched
+    expect(await page.evaluate(() => (window as any).__caddy.state.features.length)).toBe(historyBefore);
+    expect(errors).toEqual([]);
+  });
+});

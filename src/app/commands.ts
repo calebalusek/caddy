@@ -82,7 +82,7 @@ export const COMMANDS: Command[] = [
   C('patcirc', 'Circular pattern', 'PTC', 'solid', 'modify', 'pattern', ['pattern', 'polar array', 'circular', 'bolt circle'], () => openPattern('Circular')),
   C('mirror', 'Mirror', 'MI', 'solid', 'modify', 'mirror', ['mirror', 'flip', 'symmetry'], () => openDialog('mirror')),
   C('plane', 'Offset plane', 'PL', 'solid', 'construct', 'plane', ['plane', 'construction plane', 'work plane', 'offset plane', 'datum'], () => openDialog('plane')),
-  C('overhang', 'Overhang check', 'OV', 'solid', 'print', 'overhang', ['overhang', 'support', 'printability']),
+  C('overhang', 'Overhang check', 'OV', 'solid', 'print', 'overhang', ['overhang', 'support', 'printability'], () => openDialog('overhang')),
   C('stl', 'Export STL', 'STL', 'solid', 'print', 'export', ['export', 'stl', 'save mesh', 'print file'], () => openSaveWindow('export', 'stl')),
   C('3mf', 'Export 3MF', '3MF', 'solid', 'print', 'export', ['export', '3mf', 'slicer', 'print file'], () => openSaveWindow('export', '3mf')),
   C('step', 'Export STEP', 'STEP', 'solid', 'print', 'export', ['export', 'step', 'stp', 'cad file', 'exact'], () => openSaveWindow('export', 'step')),

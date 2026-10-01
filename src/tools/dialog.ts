@@ -77,6 +77,8 @@ export interface ToolDef<P = any> {
   onBuilt?: (A: ActiveDialog<P>) => void;
   /** The menu is closing: remove the tool's highlights. */
   onClose?: (A: ActiveDialog<P>) => void;
+  /** A check or view, not a feature: nothing is added to the History, so Ctrl+Z has nothing to undo for it. */
+  noFeature?: boolean;
   /** Create or update the feature. Return true to close the menu. */
   commit: (A: ActiveDialog<P>, params: P) => boolean;
 }
@@ -340,7 +342,7 @@ export function commitDialog(): void {
   const before = A.undoBefore || snapshotDoc();
   if (!A.def.commit(A, cloneParams(A.params))) return;
   const f = A.edit || state.features[state.features.length - 1];
-  if (f) pushUndo({ kind: 'feature', id: f.id, before });
+  if (f && !A.def.noFeature) pushUndo({ kind: 'feature', id: f.id, before });
   A.undoBefore = undefined;
   closeDialog();
 }
