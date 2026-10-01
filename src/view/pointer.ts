@@ -1,13 +1,17 @@
 // Mouse in the viewport: left-drag orbits, right-drag (or Shift+drag) pans, wheel zooms.
-// A press that does not move is a click and goes to the picking code.
-import { handleDragMove, handleDragStart, overHandle, type HandleDrag } from '../tools/dialog';
-import { clickAt, hoverLeave, hoverMove, setPointer } from '../tools/pick';
+// A press that does not move is a click and goes to the interaction code.
+import { state } from '../app/state';
+import { sketchDragEnd, sketchDragMove, sketchDragStart, type SketchDrag } from '../sketch/tools';
+import { focusPrimary, handleDragMove, handleDragStart, overHandle, type HandleDrag } from '../tools/dialog';
+import { setPointer } from '../tools/pick';
+import { clickAt, doubleClickAt, hoverLeave, hoverMove } from './interaction';
 import { cam, camera, canvas, V3 } from './scene';
 import { stopAnimation } from './views';
 
 type Ptr =
   | { mode: 'orbit' | 'pan'; x: number; y: number; moved: boolean }
-  | { mode: 'handle'; drag: HandleDrag };
+  | { mode: 'handle'; drag: HandleDrag }
+  | { mode: 'skdrag'; drag: SketchDrag };
 
 export function initPointer(): void {
   let ptr: Ptr | null = null;
@@ -18,15 +22,21 @@ export function initPointer(): void {
     setPointer(e);
     const drag = handleDragStart(e);
     if (drag) { ptr = { mode: 'handle', drag }; canvas.style.cursor = 'grabbing'; return; }
+    // with no sketch tool active, pressing on a point, line or circle drags it
+    if (state.mode === 'sketch' && !state.pick) {
+      const sd = sketchDragStart(e);
+      if (sd) { ptr = { mode: 'skdrag', drag: sd }; return; }
+    }
     ptr = { mode: e.button === 0 && !e.shiftKey ? 'orbit' : 'pan', x: e.clientX, y: e.clientY, moved: false };
   });
   canvas.addEventListener('pointermove', (e) => {
     setPointer(e);
     if (!ptr) {
-      hoverMove();
+      hoverMove(e);
       if (overHandle()) canvas.style.cursor = 'grab';
       return;
     }
+    if (ptr.mode === 'skdrag') { sketchDragMove(e, ptr.drag); return; }
     if (ptr.mode === 'handle') { handleDragMove(e, ptr.drag, cam.r); return; }
     const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
     if (!ptr.moved && Math.hypot(dx, dy) < 4) return;
@@ -46,12 +56,15 @@ export function initPointer(): void {
     const was = ptr;
     ptr = null;
     canvas.style.cursor = '';
-    if (was.mode === 'handle' || was.moved) return;
+    if (was.mode === 'handle') { focusPrimary(); return; }
+    if (was.mode === 'skdrag') { sketchDragEnd(was.drag); return; }
+    if (was.moved) return;
     setPointer(e);
     clickAt(e);
-    hoverMove();
+    if (!state.tool) hoverMove(e);
   });
   canvas.addEventListener('pointercancel', () => { ptr = null; canvas.style.cursor = ''; });
+  canvas.addEventListener('dblclick', (e) => { setPointer(e); doubleClickAt(); });
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     stopAnimation();

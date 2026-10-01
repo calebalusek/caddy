@@ -4,6 +4,7 @@ import { icon } from '../core/icons';
 import { byId, COMMANDS, runCommand, type Command } from '../app/commands';
 import { on } from '../app/hub';
 import { state } from '../app/state';
+import { TOOL_NAMES, toolPrompt } from '../sketch/tools';
 import { message } from './message';
 
 const GROUP_LABEL: Record<string, string> = { file: 'File', create: 'Create', modify: 'Modify', construct: 'Constraints', print: 'Print', sketch: 'Sketch', finish: 'Sketch', view: 'View' };
@@ -71,6 +72,12 @@ export function updatePrompt(): void {
   }
   cmdInput.disabled = false;
   if (state.pick) { pr.textContent = state.pick.title; pr.className = 'prompt pick'; cmdInput.placeholder = state.pick.prompt + '. Esc to cancel.'; return; }
+  if (state.mode === 'sketch' && state.sketch) {
+    pr.textContent = state.tool ? `${state.sketch.name}: ${TOOL_NAMES[state.tool.type]}` : state.sketch.name;
+    pr.className = 'prompt sketch';
+    cmdInput.placeholder = toolPrompt();
+    return;
+  }
   pr.textContent = 'Command';
   pr.className = 'prompt';
   cmdInput.placeholder = 'Start typing anywhere, like sk, ex or pl';
@@ -109,7 +116,8 @@ export function renderToolbar(): void {
         .map((id) => {
           const c = byId(id)!;
           const planned = !c.run && !c.step;
-          const pressed = !sk && state.active && state.active.type === id ? ' aria-pressed="true"' : '';
+          const on = c.tool ? !!state.tool && state.tool.type === c.tool : !sk && !!state.active && state.active.type === id;
+          const pressed = c.tool || on ? ` aria-pressed="${on}"` : '';
           return `<button class="tbtn${planned ? ' planned' : ''}" data-cmd="${id}"${pressed} title="${c.name} (${c.alias})${planned ? ', planned' : ''}">${icon(c.icon)}<span class="tname">${SHORT[id] || c.name}</span><span class="talias">${c.alias}</span></button>`;
         })
         .join('')}</div><div class="tgroup-label"><span>${label}</span></div></div>`,

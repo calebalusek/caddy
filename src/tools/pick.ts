@@ -49,8 +49,8 @@ export function cancelPick(): void {
   else message('Selection canceled');
 }
 
-/** The plane under the cursor, if a click on it would do something. */
-function planeUnderCursor(): PlaneVis | null {
+/** The plane under the cursor, and how far along the cursor ray it is. */
+export function planeUnderCursor(): { vis: PlaneVis; distance: number } | null {
   const opts = state.pick;
   const cands = pickablePlanes().filter((v) => {
     if (opts && opts.beforeIndex != null && v.ref.kind === 'plane') {
@@ -60,27 +60,7 @@ function planeUnderCursor(): PlaneVis | null {
     return true;
   });
   const hit = ray.intersectObjects(cands.map((v) => v.fill), false)[0];
-  return hit ? (hit.object.userData.vis as PlaneVis) : null;
-}
-
-/** Whether the viewport takes plane clicks right now. */
-const planesClickable = (): boolean => !!state.pick || (!state.active && state.mode === 'solid');
-
-export function hoverMove(): void {
-  const v = planesClickable() ? planeUnderCursor() : null;
-  const key = v ? v.key : null;
-  if (key !== state.hoverKey) { state.hoverKey = key; emit('select'); }
-  canvas.style.cursor = v ? 'pointer' : '';
-  if (state.pick) {
-    pickTip.textContent = state.pick.prompt;
-    pickTip.style.display = 'block';
-    pickTip.style.transform = `translate(${Math.round(mouse.x + 14)}px, ${Math.round(mouse.y + 20)}px)`;
-  }
-}
-
-export function hoverLeave(): void {
-  pickTip.style.display = 'none';
-  if (state.hoverKey) { state.hoverKey = null; emit('select'); }
+  return hit ? { vis: hit.object.userData.vis as PlaneVis, distance: hit.distance } : null;
 }
 
 export function clearSelection(): void {
@@ -89,28 +69,14 @@ export function clearSelection(): void {
   emit('select');
 }
 
-/** A click in the viewport that was not a drag. */
-export function clickAt(e: PointerEvent): void {
-  if (e.button !== 0) return;
-  const v = planeUnderCursor();
-  if (state.pick) {
-    if (!v) return;
-    const p = state.pick;
-    endPick();
-    p.onPick(v.ref);
-    return;
-  }
-  if (state.active || state.mode !== 'solid') return;
-  if (!v) {
-    if (!e.shiftKey && state.selection.length) { clearSelection(); message('Selection cleared'); }
-    return;
-  }
-  const had = state.selection.some((s) => s.key === v.key);
-  if (e.shiftKey) state.selection = had ? state.selection.filter((s) => s.key !== v.key) : state.selection.concat({ kind: 'plane', key: v.key, ref: v.ref });
-  else state.selection = had && state.selection.length === 1 ? [] : [{ kind: 'plane', key: v.key, ref: v.ref }];
-  emit('select');
-  if (state.selection.length) message(`${planeName(v.ref)} selected. sk sketches on it, pl offsets a plane from it.`);
+/** Show the pick prompt next to the cursor while a tool asks for a plane. */
+export function showPickTip(): void {
+  if (!state.pick) return;
+  pickTip.textContent = state.pick.prompt;
+  pickTip.style.display = 'block';
+  pickTip.style.transform = `translate(${Math.round(mouse.x + 14)}px, ${Math.round(mouse.y + 20)}px)`;
 }
+export function hidePickTip(): void { pickTip.style.display = 'none'; }
 
 /** A plane selected before the tool was started (select first, then tool). */
 export function selectedPlaneRef(): PlaneRef | null {

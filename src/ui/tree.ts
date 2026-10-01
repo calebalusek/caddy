@@ -5,6 +5,7 @@ import { emit, on } from '../app/hub';
 import { deleteBody, deleteFeature, markDirty, toggleVis } from '../app/history';
 import { bodyById, featById, feats, state } from '../app/state';
 import type { Feature, OriginPlaneId, PlaneRef } from '../model/types';
+import { enterSketch, finishSketch, lookAtSketch, selectSketch } from '../sketch/session';
 import { hasTool, openDialog } from '../tools/dialog';
 import { endPick } from '../tools/pick';
 import { message } from './message';
@@ -17,6 +18,7 @@ export function editRef(ref: string): void {
   const [kind, id] = ref.split(':');
   const f = featById(id);
   if (!f) return;
+  if (f.type === 'sketch') { enterSketch(f); return; }
   const tool = kind === 'fillet' ? String((f.params as any).kind || 'fillet') : kind;
   if (hasTool(tool)) openDialog(tool, f);
   else message(`Editing ${f.name} arrives in step ${TOOL_STEP[kind] || '?'} of the rebuild.`);
@@ -40,7 +42,11 @@ function ctxItems(ref: string): MenuItem[] {
   if (!f) return [];
   const items: MenuItem[] = [];
   if (kind === 'plane') items.push({ label: 'Edit plane', icon: 'plane', act: () => editRef(ref) });
-  else if (kind === 'sketch') items.push({ label: 'Edit sketch', icon: 'sketch', act: () => editRef(ref) });
+  else if (f.type === 'sketch') {
+    const editing = state.sketch === f;
+    items.push({ label: editing ? 'Finish sketch' : 'Edit sketch', icon: editing ? 'finish' : 'sketch', act: () => (editing ? finishSketch() : enterSketch(f)) });
+    if (!f.error) items.push({ label: 'Look at', icon: 'look', act: () => lookAtSketch(f) });
+  }
   else if (kind === 'extrude') { const cut = (f.params as any).operation === 'Cut'; items.push({ label: 'Edit ' + (cut ? 'cut' : 'extrude'), icon: cut ? 'cut' : 'extrude', act: () => editRef(ref) }); }
   items.push({ label: 'Rename', icon: 'rename', act: () => startRename(ref) });
   if (kind === 'fillet') { const k = String((f.params as any).kind || 'fillet'); items.push({ label: 'Edit ' + k, icon: k, act: () => editRef(ref) }); }
@@ -94,7 +100,7 @@ export function renderTree(): void {
     `<details data-sec="origin"${openSections.origin || state.pick ? ' open' : ''}><summary data-ref="origin"><span class="nm">Origin</span>${eyeBtn('origin', 'origin planes', state.originPlanesVisible)}</summary><ul>
       ${staticRow('point', 'Origin point')}${staticRow('axis', 'X axis', 'axis-x')}${staticRow('axis', 'Y axis', 'axis-y')}${staticRow('axis', 'Z axis', 'axis-z')}
       ${originPlaneRow('XY')}${originPlaneRow('XZ')}${originPlaneRow('YZ')}</ul></details>` +
-    sec('sketches', 'Sketches', sks.length, sks.length ? `<ul>${sks.map((f) => row('sketch:' + f.id, 'sketch', 'sketch', f.name, f.visible, f.error ? 'err' : '')).join('')}</ul>` : '<div class="empty">Type sk to start a sketch</div>') +
+    sec('sketches', 'Sketches', sks.length, sks.length ? `<ul>${sks.map((f) => row('sketch:' + f.id, 'sketch', 'sketch', f.name, f.visible, (f.error ? 'err ' : '') + (state.sketch === f ? 'editing ' : '') + (state.treeSel === f.id ? 'tsel' : ''))).join('')}</ul>` : '<div class="empty">Type sk to start a sketch</div>') +
     sec('construction', 'Construction', pls.length, pls.length ? `<ul>${pls.map((f) => row('plane:' + f.id, 'plane', 'plane', f.name, f.visible, (f.error ? 'err ' : '') + (state.selection.some((s) => s.key === 'plane:' + f.id) ? 'tsel' : ''))).join('')}</ul>` : '<div class="empty">Offset planes show up here</div>') +
     sec('bodies', 'Bodies', bs.length, bs.length ? `<ul>${bs.map((b) => row('body:' + b.id, 'body', 'body', b.name, b.visible)).join('')}</ul>` : '<div class="empty">Extrude a profile to make a body</div>');
 }
@@ -118,7 +124,7 @@ export function renderTimeline(): void {
     .map((f) => {
       const p = f.params as any;
       const cut = f.type === 'extrude' && p.operation === 'Cut';
-      const editing = !!state.active && state.active.edit === f;
+      const editing = (!!state.active && state.active.edit === f) || state.sketch === f;
       const kind = cut ? 'cut' : f.type;
       const t = tip(f);
       return `<li><button class="tl-item k-${kind}${editing ? ' editing' : ''}${f.error ? ' err' : ''}" data-ref="${f.type}:${f.id}" title="${esc(t)}${f.error ? ' (needs attention' + (f.note ? ': ' + f.note : '') + ')' : ''}" aria-label="${esc(t)}" aria-haspopup="menu">${icon(cut ? 'cut' : f.type === 'fillet' ? p.kind : f.type)}</button></li>`;
@@ -184,8 +190,19 @@ export function initTree(): void {
     if (kind === 'origin') return;
     // The tree re-renders on click, so a native dblclick never arrives: detect the second click here.
     const now = performance.now();
-    if (lastClick.ref === ref && now - lastClick.t < 450) { lastClick = { ref: '', t: 0 }; editRef(ref); return; }
+    if (lastClick.ref === ref && now - lastClick.t < 450) {
+      lastClick = { ref: '', t: 0 };
+      if (!(state.sketch && ref === 'sketch:' + state.sketch.id)) editRef(ref);
+      return;
+    }
     lastClick = { ref, t: now };
+    if (kind === 'sketch' && !state.active && state.mode !== 'sketch') {
+      // single click highlights the whole sketch (through bodies); double-click edits it
+      const f = featById(id);
+      selectSketch(state.treeSel === id ? null : id);
+      if (f && state.treeSel) message(f.visible === false ? `${f.name} is hidden; showing its highlight anyway` : `${f.name} highlighted. Double-click to edit it.`);
+      return;
+    }
     if (kind === 'plane' && !state.active) {
       const key = 'plane:' + id, had = state.selection.some((s) => s.key === key);
       const sel = { kind: 'plane' as const, key, ref: { kind: 'plane' as const, id } };
@@ -248,7 +265,7 @@ export function initTree(): void {
   // Hover also fires 'select'; only redraw the Browser when the selection itself changed.
   let selSig = '';
   on('select', () => {
-    const sig = state.selection.map((s) => s.key).join('|');
+    const sig = state.selection.map((s) => s.key).join('|') + '#' + (state.treeSel || '');
     if (sig !== selSig) { selSig = sig; renderTree(); }
   });
   render();

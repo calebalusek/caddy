@@ -35,6 +35,9 @@ export interface Profile {
   /** Exact area of the region (loop minus holes). */
   area: number;
   outer: boolean;
+  /** Set when the sketch is drawn: a point safely inside the region, and where the drag arrow sits. */
+  inner?: P2;
+  centroid?: P2;
 }
 
 const TAU = Math.PI * 2;

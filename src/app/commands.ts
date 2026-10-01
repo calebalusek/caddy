@@ -5,6 +5,8 @@ import { $ } from '../core/dom';
 import { emit } from './hub';
 import { newProject, toggleVis, undo } from './history';
 import { saveUsage, state } from './state';
+import { finishSketch, lookAtSketch, startSketchPick } from '../sketch/session';
+import { setTool } from '../sketch/tools';
 import { openDialog } from '../tools/dialog';
 import { endPick } from '../tools/pick';
 import { message } from '../ui/message';
@@ -63,7 +65,7 @@ export function renderDocName(): void {
 }
 
 export const COMMANDS: Command[] = [
-  C('sketch', 'Create sketch', 'SK', 'solid', 'create', 'sketch', ['sketch', 'new sketch', 'draw'], 2),
+  C('sketch', 'Create sketch', 'SK', 'solid', 'create', 'sketch', ['sketch', 'new sketch', 'draw'], () => startSketchPick(null)),
   C('extrude', 'Extrude', 'EX', 'solid', 'create', 'extrude', ['extrude', 'ext', 'pull', 'push', 'boss', 'pad', 'cut', 'pocket'], 3),
   C('revolve', 'Revolve', 'REV', 'solid', 'create', 'revolve', ['revolve', 'lathe', 'spin', 'turn'], 5),
   C('sweep', 'Sweep', 'SW', 'solid', 'create', 'sweep', ['sweep', 'pipe', 'tube', 'follow path', 'rail'], 6),
@@ -79,26 +81,26 @@ export const COMMANDS: Command[] = [
   C('overhang', 'Overhang check', 'OV', 'solid', 'print', 'overhang', ['overhang', 'support', 'printability']),
   C('stl', 'Export STL', 'STL', 'solid', 'print', 'export', ['export', 'stl', 'save mesh', 'print file'], 4),
   C('3mf', 'Export 3MF', '3MF', 'solid', 'print', 'export', ['export', '3mf', 'slicer', 'print file'], 4),
-  C('line', 'Line', 'L', 'sketch', 'sketch', 'line', ['line', 'polyline'], 2, { tool: 'line', starts: true }),
-  C('rectangle', 'Rectangle', 'REC', 'sketch', 'sketch', 'rect', ['rectangle', 'box', 'square'], 2, { tool: 'rect', starts: true }),
-  C('circle', 'Circle', 'C', 'sketch', 'sketch', 'circle', ['circle'], 2, { tool: 'circle', starts: true }),
+  C('line', 'Line', 'L', 'sketch', 'sketch', 'line', ['line', 'polyline'], () => setTool('line'), { tool: 'line', starts: true }),
+  C('rectangle', 'Rectangle', 'REC', 'sketch', 'sketch', 'rect', ['rectangle', 'box', 'square'], () => setTool('rect'), { tool: 'rect', starts: true }),
+  C('circle', 'Circle', 'C', 'sketch', 'sketch', 'circle', ['circle'], () => setTool('circle'), { tool: 'circle', starts: true }),
   C('stext', 'Text', 'TE', 'sketch', 'sketch', 'text', ['text', 'emboss', 'engrave', 'label']),
-  C('arc', 'Arc', 'A', 'sketch', 'sketch', 'arc', ['arc', 'curve', '3 point arc'], 2, { tool: 'arc', starts: true }),
-  C('polygon', 'Polygon', 'POL', 'sketch', 'sketch', 'polygon', ['polygon', 'hexagon', 'octagon', 'nut'], 2, { tool: 'polygon', starts: true }),
-  C('trim', 'Trim', 'TR', 'sketch', 'modify', 'trim', ['trim', 'cut back', 'delete segment'], 2, { tool: 'trim' }),
-  C('soffset', 'Offset', 'OF', 'sketch', 'modify', 'soffset', ['offset', 'offset curve', 'parallel copy'], 2, { tool: 'offset' }),
-  C('move', 'Move', 'M', 'sketch', 'modify', 'move', ['move', 'translate', 'displace', 'relocate'], 2, { tool: 'move' }),
-  C('dimension', 'Dimension', 'D', 'sketch', 'construct', 'dimension', ['dimension', 'dim', 'size', 'measure'], 2, { tool: 'dim' }),
-  C('coincident', 'Coincident', 'CO', 'sketch', 'construct', 'coincident', ['coincident', 'join points', 'connect', 'merge'], 2, { tool: 'coincident' }),
-  C('tangent', 'Tangent', 'TA', 'sketch', 'construct', 'tangent', ['tangent', 'tangency'], 2, { tool: 'tangent' }),
-  C('midpt', 'Midpoint', 'MP', 'sketch', 'construct', 'midpoint', ['midpoint', 'middle', 'center on line'], 2, { tool: 'midpt' }),
-  C('hv', 'Horizontal/Vertical', 'HV', 'sketch', 'construct', 'hv', ['horizontal', 'vertical', 'level', 'plumb'], 2, { tool: 'hv' }),
-  C('perp', 'Perpendicular', 'PE', 'sketch', 'construct', 'perp', ['perpendicular', 'square', '90'], 2, { tool: 'perp' }),
-  C('par', 'Parallel', 'PA', 'sketch', 'construct', 'par', ['parallel'], 2, { tool: 'par' }),
-  C('equal', 'Equal', 'EQ', 'sketch', 'construct', 'equal', ['equal', 'same size', 'match'], 2, { tool: 'equal' }),
-  C('fix', 'Fix', 'FIX', 'sketch', 'construct', 'fix', ['fix', 'lock', 'anchor', 'ground', 'unfix'], 2, { tool: 'fix' }),
-  C('finish', 'Finish sketch', 'FS', 'sketch', 'finish', 'finish', ['finish', 'finish sketch', 'done', 'exit sketch'], 2),
-  C('lookat', 'Look at sketch', 'LA', 'sketch', 'view', 'look', ['look at', 'normal view'], 2),
+  C('arc', 'Arc', 'A', 'sketch', 'sketch', 'arc', ['arc', 'curve', '3 point arc'], () => setTool('arc'), { tool: 'arc', starts: true }),
+  C('polygon', 'Polygon', 'POL', 'sketch', 'sketch', 'polygon', ['polygon', 'hexagon', 'octagon', 'nut'], () => setTool('polygon'), { tool: 'polygon', starts: true }),
+  C('trim', 'Trim', 'TR', 'sketch', 'modify', 'trim', ['trim', 'cut back', 'delete segment'], () => setTool('trim'), { tool: 'trim' }),
+  C('soffset', 'Offset', 'OF', 'sketch', 'modify', 'soffset', ['offset', 'offset curve', 'parallel copy'], () => setTool('offset'), { tool: 'offset' }),
+  C('move', 'Move', 'M', 'sketch', 'modify', 'move', ['move', 'translate', 'displace', 'relocate'], () => setTool('move'), { tool: 'move' }),
+  C('dimension', 'Dimension', 'D', 'sketch', 'construct', 'dimension', ['dimension', 'dim', 'size', 'measure'], () => setTool('dim'), { tool: 'dim' }),
+  C('coincident', 'Coincident', 'CO', 'sketch', 'construct', 'coincident', ['coincident', 'join points', 'connect', 'merge'], () => setTool('coincident'), { tool: 'coincident' }),
+  C('tangent', 'Tangent', 'TA', 'sketch', 'construct', 'tangent', ['tangent', 'tangency'], () => setTool('tangent'), { tool: 'tangent' }),
+  C('midpt', 'Midpoint', 'MP', 'sketch', 'construct', 'midpoint', ['midpoint', 'middle', 'center on line'], () => setTool('midpt'), { tool: 'midpt' }),
+  C('hv', 'Horizontal/Vertical', 'HV', 'sketch', 'construct', 'hv', ['horizontal', 'vertical', 'level', 'plumb'], () => setTool('hv'), { tool: 'hv' }),
+  C('perp', 'Perpendicular', 'PE', 'sketch', 'construct', 'perp', ['perpendicular', 'square', '90'], () => setTool('perp'), { tool: 'perp' }),
+  C('par', 'Parallel', 'PA', 'sketch', 'construct', 'par', ['parallel'], () => setTool('par'), { tool: 'par' }),
+  C('equal', 'Equal', 'EQ', 'sketch', 'construct', 'equal', ['equal', 'same size', 'match'], () => setTool('equal'), { tool: 'equal' }),
+  C('fix', 'Fix', 'FIX', 'sketch', 'construct', 'fix', ['fix', 'lock', 'anchor', 'ground', 'unfix'], () => setTool('fix'), { tool: 'fix' }),
+  C('finish', 'Finish sketch', 'FS', 'sketch', 'finish', 'finish', ['finish', 'finish sketch', 'done', 'exit sketch'], () => finishSketch()),
+  C('lookat', 'Look at sketch', 'LA', 'sketch', 'view', 'look', ['look at', 'normal view'], () => lookAtSketch()),
   C('home', 'Home view', 'HOME', 'any', 'view', 'view', ['home', 'iso', 'isometric', 'reset view'], () => goHome()),
   C('bottom', 'Bottom view', 'BO', 'any', 'view', 'view', ['bottom', 'underside'], () => setView('bottom')),
   C('back', 'Back view', 'BA', 'any', 'view', 'view', ['back', 'rear'], () => setView('back')),
@@ -137,6 +139,8 @@ export function runCommand(id: string): void {
   if (!c.run) { message(notReadyText(c)); return; }
   if (document.activeElement === input) input.blur();
   if (c.ctx === 'sketch' && state.mode !== 'sketch') {
+    // a draw command typed outside a sketch starts one, then the tool
+    if (c.starts) { state.last = id; startSketchPick(c.tool); return; }
     message(`${c.name} works inside a sketch. Type sk to start one, or double-click a sketch to edit it.`);
     return;
   }

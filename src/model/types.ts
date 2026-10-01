@@ -1,4 +1,6 @@
 // The document model: plain data only, so it can be saved, sent to the worker and tested in Node.
+import type { SketchData, SketchStatus } from '../sketch/model';
+import type { Profile } from '../sketch/profiles';
 
 export type Vec3 = [number, number, number];
 
@@ -34,16 +36,33 @@ export interface PlaneFeature extends FeatureBase {
   frame?: Frame | null;
 }
 
+/** A point on a body face that a sketch on that face can snap to. */
+export interface ExtSnap { p: [number, number]; kind: 'end' | 'mid' | 'center' | 'quad'; ext: true }
+
+export interface SketchFeature extends FeatureBase, SketchData {
+  type: 'sketch';
+  params: { ref: PlaneRef | null };
+  /** Undo snapshots while editing (not saved). */
+  hist: string[];
+  /** Resolved by regenerate. */
+  frame?: Frame | null;
+  status?: SketchStatus;
+  profiles?: Profile[];
+  /** Sketch lies on a body face: bodies stay solid and its edges offer snap points. */
+  onFace?: boolean;
+  ext?: ExtSnap[];
+}
+
 /** Feature types whose tools are rebuilt in later steps keep their saved parameters untouched. */
 export interface OtherFeature extends FeatureBase {
-  type: 'sketch' | 'extrude' | 'fillet' | 'revolve' | 'hole' | 'sweep' | 'shell' | 'pattern';
+  type: 'extrude' | 'fillet' | 'revolve' | 'hole' | 'sweep' | 'shell' | 'pattern';
   params: Record<string, unknown>;
   bodyId?: string;
   bodyIds?: string[];
   [key: string]: unknown;
 }
 
-export type Feature = PlaneFeature | OtherFeature;
+export type Feature = PlaneFeature | SketchFeature | OtherFeature;
 export type FeatureType = Feature['type'];
 
 export interface Body {

@@ -11,9 +11,10 @@ import { runCommand } from './app/commands';
 import { emit } from './app/hub';
 import { newProject, undo } from './app/history';
 import { regenerate } from './app/regenerate';
-import { state } from './app/state';
+import { feats, state } from './app/state';
 import { $ } from './core/dom';
 import { Kernel } from './kernel/client';
+import { toWorld } from './model/frames';
 import { initDialogs, openDialog } from './tools/dialog';
 import './tools/plane';
 import { initChrome } from './ui/chrome';
@@ -25,7 +26,10 @@ import { initTree } from './ui/tree';
 import { initPointer } from './view/pointer';
 import { applyGridVisibility, cam, camera, canvas, startScene, updateCamera, V3 } from './view/scene';
 import { initViewCube } from './view/viewcube';
-import { initViewsBar } from './view/views';
+import { addFitSource, initViewsBar } from './view/views';
+import { initSketchSession } from './sketch/session';
+import { initSketchTools } from './sketch/tools';
+import { sketchGroupVisible, sketchWorldPoints } from './sketch/visuals';
 
 // The geometry engine loads in the background; the UI is usable straight away.
 const kernel = new Kernel();
@@ -46,6 +50,9 @@ const kernelReady = kernel.call('ping').then(
 initMenu();
 initChrome();
 initDialogs();
+initSketchSession();
+initSketchTools();
+addFitSource(() => feats('sketch').filter(sketchGroupVisible).flatMap(sketchWorldPoints));
 initCommandBar();
 initTree();
 initViewsBar();
@@ -69,4 +76,9 @@ function screenOf(p: [number, number, number]): { x: number; y: number } {
   const v = new V3(...p).project(camera), r = canvas.getBoundingClientRect();
   return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
 }
-window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf };
+/** Where a point of the sketch being edited lands on the page. */
+function sketchScreen(x: number, y: number): { x: number; y: number } | null {
+  const sk = state.sketch;
+  return sk && sk.frame ? screenOf(toWorld(sk.frame, x, y)) : null;
+}
+window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen };

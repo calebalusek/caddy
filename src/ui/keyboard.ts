@@ -2,6 +2,10 @@
 import { runCommand } from '../app/commands';
 import { undo } from '../app/history';
 import { state } from '../app/state';
+import { isDim } from '../sketch/model';
+import { selectSketch, setOverlaySel, startDimEdit } from '../sketch/session';
+import { advanceSelect, deleteSketchSel, exitTool, hudEnter, hudShown, toolBusy, typeIntoHud } from '../sketch/tools';
+import { refreshSketchStyles } from '../sketch/visuals';
 import { commitDialog, escapeDialog, typeIntoDialog } from '../tools/dialog';
 import { cancelPick, clearSelection } from '../tools/pick';
 import { commandInputEmpty, isCommandInput, typeIntoCommand } from './cmdbar';
@@ -15,7 +19,7 @@ export function initKeyboard(): void {
       const k = e.key.toLowerCase();
       if (k === 's') { e.preventDefault(); runCommand('save'); return; }
       if (k === 'o') { e.preventDefault(); runCommand('openfile'); return; }
-      if (k === 'z') { if (!inField || (isCommandInput(t) && commandInputEmpty())) { e.preventDefault(); undo(); } return; }
+      if (k === 'z') { if (!inField || (isCommandInput(t) && commandInputEmpty()) || t.closest('.hud')) { e.preventDefault(); undo(); } return; }
     }
     if (inField || e.ctrlKey || e.metaKey || e.altKey) return;
     const onButton = !!t.matches && t.matches('button, summary, a');
@@ -26,8 +30,33 @@ export function initKeyboard(): void {
       return;
     }
     if (state.pick && e.key === 'Escape') { cancelPick(); return; }
-    if (e.key === 'Escape') {
-      if (state.selection.length) { clearSelection(); message('Selection cleared'); }
+    if (state.mode === 'sketch' && state.sketch) {
+      const T = state.tool, sk = state.sketch;
+      if (e.key === 'Escape') {
+        if (T) { exitTool(); message('Back to select. Click to pick, Shift+click for more, drag to move.'); }
+        else if (state.skSel || state.skSels.length) { state.skSel = null; state.skSels = []; refreshSketchStyles(sk); setOverlaySel(); message('Selection cleared'); }
+        else message('Type fs or press Finish sketch to leave the sketch');
+        return;
+      }
+      const busy = toolBusy();
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.skSel && !busy) { e.preventDefault(); deleteSketchSel(); return; }
+      if ((e.key === 'Enter' || e.key === 'F2') && !busy && state.skSel && state.skSel.kind === 'con' && !onButton) {
+        const id = state.skSel.id, c = sk.cons.find((x) => x.id === id);
+        if (c && isDim(c)) { e.preventDefault(); startDimEdit(c.id); return; }
+      }
+      if (T && hudShown()) {
+        // numbers typed over the viewport go straight into the tool's value box
+        if (/^[0-9.\-+*/()]$/.test(e.key)) { e.preventDefault(); typeIntoHud(e.key); return; }
+        if (e.key === 'Enter') { e.preventDefault(); hudEnter(); return; }
+      }
+      if (T && (T.type === 'offset' || T.type === 'move') && T.phase === 'select' && (e.key === 'Enter' || e.key === ' ') && !onButton) { e.preventDefault(); advanceSelect(); return; }
+      if (T && (e.key === ' ' || e.key === 'Enter') && !onButton) { e.preventDefault(); return; }
+    } else if (e.key === 'Escape') {
+      const had = state.selection.length > 0 || !!state.treeSel || !!state.selected;
+      state.selected = null;
+      if (state.treeSel) selectSketch(null);
+      clearSelection();
+      if (had) message('Selection cleared');
       return;
     }
     if (e.key === 'Enter' || e.key === ' ') {

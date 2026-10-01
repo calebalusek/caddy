@@ -2,7 +2,7 @@
 import { $, root, storage } from '../core/dom';
 import { icon } from '../core/icons';
 import { byId, notReadyText, renderDocName, runCommand, startDocRename } from '../app/commands';
-import { emit } from '../app/hub';
+import { emit, on } from '../app/hub';
 import { state } from '../app/state';
 import { message } from './message';
 import { openMenu } from './menu';
@@ -82,6 +82,8 @@ function initViewMode(): void {
     if (b.dataset.m === 'render') message(notReadyText(byId('renderview')!));
     else message('Design view');
   });
+  // the sketch bar takes this spot while sketching
+  on('mode', () => { $('#rmode').hidden = state.mode === 'sketch'; });
 }
 
 export function initChrome(): void {

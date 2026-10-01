@@ -3,8 +3,7 @@ export const root = document.documentElement;
 export const cssv = (n: string): string => getComputedStyle(root).getPropertyValue(n).trim();
 export const esc = (s: unknown): string =>
   String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-/** Values shown to the user: at most two decimals, no trailing zeros. */
-export const fmt = (v: number): string => String(Math.round(v * 100) / 100);
+export { fmt } from './format';
 export const reduceMotion = (): boolean => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export const storage = {

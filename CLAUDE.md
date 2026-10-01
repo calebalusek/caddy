@@ -23,6 +23,9 @@ parts for **3D printing**. Built for the owner and other people to use.
   - **Step 0 done**: Vite + TypeScript, replicad/OpenCascade in a Web Worker (`src/kernel/`), tests.
   - **Step 1 done**: app shell (`src/ui/`, `src/view/`), shared tool-menu system
     (`src/tools/dialog.ts`, `src/ui/panel.ts`), plane picking, Offset plane as the first tool.
+  - **Step 2 done**: sketcher (`src/sketch/`): solver, tools, snaps, tracking, dimensions,
+    constraints, offset/move/trim, ported from the prototype. Profiles are now exact
+    (`src/sketch/profiles.ts`): lines, arcs and circles split each other and keep true arc edges.
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised
