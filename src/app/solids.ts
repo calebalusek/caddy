@@ -1,7 +1,7 @@
 // Rebuilding the bodies from the timeline. The kernel runs in a Web Worker, so this is asynchronous:
 // the UI stays responsive and the bodies update when the result arrives.
 import { Kernel } from '../kernel/client';
-import type { BodyResult, BuildResult, BuildStep } from '../kernel/protocol';
+import type { BodyResult, BuildResult, BuildStep, DraftResult, PreviewBody } from '../kernel/protocol';
 import { featureSteps, findProfileIn, type ProfileParams } from '../model/steps';
 import { clearBodyHighlights, setDiffPreview, showBodies } from '../view/bodies';
 import { emit } from './hub';
@@ -13,10 +13,9 @@ export type { ProfileParams };
 /** The sketch region a feature uses (see model/steps.ts). */
 export const findProfile = (sel: ProfileParams | null | undefined): ReturnType<typeof findProfileIn> => findProfileIn(state.features, sel);
 
-let seq = 0;
 let shown: BuildResult = { bodies: [], steps: [] };
 let base: BuildResult = shown;
-let draftShown: BuildResult | null = null;
+let draftShown: PreviewBody[] | null = null;
 let pending: Promise<void> = Promise.resolve();
 let busy = 0;
 
@@ -26,14 +25,32 @@ export const isBuilding = (): boolean => busy > 0;
 /** The bodies on screen: always the model as it is; a tool's live preview is drawn over it (red = removed, blue = added). */
 export const shownBodies = (): BodyResult[] => shown.bodies;
 /** The model with the open tool's preview applied (what OK would make). */
-export const previewBodies = (): BodyResult[] => (draftShown || shown).bodies;
+export const previewBodies = (): PreviewBody[] => draftShown || shown.bodies;
 /** The bodies before the tool being used: what its picks (edges, faces) refer to. */
 export const baseBodies = (): BodyResult[] => base.bodies;
 export const baseBody = (id: string): BodyResult | undefined => base.bodies.find((b) => b.id === id);
 
-/** Bring the bodies up to date with the timeline (and the open tool's live preview, if it has one). */
+let running = false, again = false;
+/** The model the geometry engine last sent, and the key it is kept under there (so a preview does not resend it). */
+let held: { key: string; res: BuildResult } | null = null;
+
+/**
+ * Bring the bodies up to date with the timeline (and the open tool's live preview, if it has one).
+ * Only one build runs at a time: if the model changes again meanwhile (dragging an arrow), the
+ * old result is dropped and just the newest state is built next, so the preview never falls behind.
+ */
 export function rebuildSolids(): Promise<void> {
-  const my = ++seq;
+  if (running) { again = true; return pending; }
+  running = true;
+  pending = (async (): Promise<void> => {
+    try {
+      do { again = false; await buildOnce(); } while (again);
+    } finally { running = false; }
+  })();
+  return pending;
+}
+
+async function buildOnce(): Promise<void> {
   const A = state.active;
   // editing a feature rolls the timeline back to just before it, like the History marker in other CAD apps
   const upTo = A && A.edit ? state.features.indexOf(A.edit) : state.features.length;
@@ -41,31 +58,33 @@ export function rebuildSolids(): Promise<void> {
   const draft = A && A.def.draftStep ? A.def.draftStep(A) : null;
   busy++;
   emit('doc');
-  const run = async (): Promise<void> => {
-    try {
-      const out = draft ? await kernel.call('buildDraft', steps, draft) : null;
-      const baseRes = out ? out.base : await kernel.call('build', steps);
-      const draftRes = out ? out.draft : null;
-      if (my !== seq) return; // a newer rebuild is on its way
-      base = baseRes;
-      shown = baseRes;
-      draftShown = draftRes;
-      baseRes.steps.forEach((s) => { const f = featById(s.id); if (f) { f.error = !!s.error; f.note = s.note || ''; } });
-      if (A && state.active === A) A.note = draftRes ? draftRes.steps[draftRes.steps.length - 1].note || '' : '';
+  try {
+    let baseRes: BuildResult, out: DraftResult | null = null;
+    if (draft) {
+      out = await kernel.call('buildDraft', steps, draft, held ? held.key : null);
+      if (out.base) held = { key: out.baseKey, res: out.base };
+      baseRes = held!.res;
+    } else { baseRes = await kernel.call('build', steps); held = null; }
+    if (again) return; // the model changed while this was building: skip showing it
+    const sameBase = baseRes === base;
+    base = baseRes;
+    shown = baseRes;
+    draftShown = out ? out.draft.bodies : null;
+    baseRes.steps.forEach((s) => { const f = featById(s.id); if (f) { f.error = !!s.error; f.note = s.note || ''; } });
+    if (A && state.active === A) A.note = out ? out.draft.step.note || '' : '';
+    if (!sameBase) {
       state.selection = state.selection.filter((s) => s.kind === 'plane'); // face and edge ids are new after a rebuild
       clearBodyHighlights();
       showBodies(shown.bodies);
-      setDiffPreview(out ? out.removed : [], out ? out.added : []);
-      emit('doc', 'select', 'built');
-    } catch (err) {
-      if (my === seq) console.error('Rebuild failed', err);
-    } finally {
-      busy--;
-      if (!busy) emit('doc');
     }
-  };
-  pending = run();
-  return pending;
+    setDiffPreview(out ? out.removed : [], out ? out.added : []);
+    emit('doc', 'select', 'built');
+  } catch (err) {
+    console.error('Rebuild failed', err);
+  } finally {
+    busy--;
+    if (!busy) emit('doc');
+  }
 }
 
 /** What a build step reported for a feature (the tool's own bounding box, for picking the body to join). */

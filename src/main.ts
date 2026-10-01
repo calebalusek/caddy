@@ -102,4 +102,4 @@ function sketchScreen(x: number, y: number): { x: number; y: number } | null {
   const sk = state.sketch;
   return sk && sk.frame ? screenOf(toWorld(sk.frame, x, y)) : null;
 }
-window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies: previewBodies, baseBodies, projectFile, importFile, flushSave };
+window.__caddy = { state, cam, kernel, kernelReady, runCommand, openDialog, regenerate, undo, newProject, screenOf, sketchScreen, whenBuilt, shownBodies: () => previewBodies().map((b) => ({ ...b, faces: (baseBodies().find((x) => x.id === b.id) || { faces: [] }).faces })), baseBodies, projectFile, importFile, flushSave };

@@ -152,7 +152,16 @@ export interface StepResult { id: string; error?: boolean; note?: string; box?: 
 export interface BuildResult { bodies: BodyResult[]; steps: StepResult[] }
 
 /** A tool's live preview: the model as it is, the model with the tool applied, and what the tool takes away and adds. */
-export interface DraftResult { base: BuildResult; draft: BuildResult; removed: BodyMesh[]; added: BodyMesh[] }
+export interface PreviewBody { id: string; volume: number; box: [Vec3, Vec3] }
+export interface DraftResult {
+  /** The model as it is; null when it is the same one the caller already has (baseKey). */
+  base: BuildResult | null;
+  baseKey: string;
+  /** Sizes of the bodies with the tool applied, and how the tool's own step went. */
+  draft: { bodies: PreviewBody[]; step: StepResult };
+  removed: BodyMesh[];
+  added: BodyMesh[];
+}
 
 export interface KernelOps {
   ping: { args: []; result: 'ready' };
@@ -161,7 +170,7 @@ export interface KernelOps {
   /** Rebuild every body from the timeline. */
   build: { args: [steps: BuildStep[]]; result: BuildResult };
   /** The same, with one more step applied on top: for tools that preview on the real body. */
-  buildDraft: { args: [steps: BuildStep[], draft: BuildStep]; result: DraftResult };
+  buildDraft: { args: [steps: BuildStep[], draft: BuildStep, haveKey: string | null]; result: DraftResult };
   /** Triangles for STL / 3MF at a chosen fineness. ids = which bodies (null = all). */
   exportMesh: { args: [steps: BuildStep[], quality: { tolerance: number; angularTolerance: number }, ids: string[] | null]; result: { id: string; positions: Float32Array; indices: Uint32Array; volume: number }[] };
   /** A STEP file of the listed bodies. */

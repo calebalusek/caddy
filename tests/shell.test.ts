@@ -60,7 +60,7 @@ describe('live preview differences', () => {
   it('a shell preview reports exactly the material it removes (the cavity), and nothing added', async () => {
     const { buildDraft } = await import('../src/kernel/model');
     const r = buildDraft([box(40, 30, 20)], shell([top(20, 15, 20)], 2));
-    expect(r.base.bodies[0].volume).toBeCloseTo(24000, 6);
+    expect(r.base!.bodies[0].volume).toBeCloseTo(24000, 6);
     expect(r.draft.bodies[0].volume).toBeCloseTo(7152, 5);
     expect(r.removed.reduce((s, m) => s + m.volume, 0)).toBeCloseTo(36 * 26 * 18, 5);
     expect(r.added).toHaveLength(0);

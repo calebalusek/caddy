@@ -23,9 +23,9 @@ function run(req: KernelRequest): Out | Promise<Out> {
       return { result, transfer: result.bodies.flatMap((b) => meshBuffers(b.mesh)) };
     }
     case 'buildDraft': {
-      const [steps, draft] = req.args as KernelOps['buildDraft']['args'];
-      const result = buildDraft(steps, draft);
-      return { result, transfer: [...result.base.bodies, ...result.draft.bodies].flatMap((b) => meshBuffers(b.mesh)).concat(result.removed.concat(result.added).flatMap(meshBuffers)) };
+      const [steps, draft, haveKey] = req.args as KernelOps['buildDraft']['args'];
+      const result = buildDraft(steps, draft, haveKey);
+      return { result, transfer: (result.base ? result.base.bodies.flatMap((b) => meshBuffers(b.mesh)) : []).concat(result.removed.concat(result.added).flatMap(meshBuffers)) };
     }
     case 'exportMesh': {
       const [steps, quality, ids] = req.args as KernelOps['exportMesh']['args'];

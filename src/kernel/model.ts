@@ -205,7 +205,11 @@ function matchFace(shape: Shape3D, spec: FaceSpec, tags: Map<string, string>, sc
 }
 
 /** Run the timeline's solid features in order. Everything created is tracked in sc and freed by the caller. */
-function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results: StepResult[] } {
+/**
+ * Builds bodies step by step. `run` can be called again with more steps to continue from where it
+ * stopped (a tool's live preview runs just its one step on top of the finished model).
+ */
+function makeRunner(steps: BuildStep[], sc: Scope) {
   const bodies: BodyState[] = [];
   const body = (id: string): BodyState => { let b = bodies.find((x) => x.id === id); if (!b) { b = { id, shape: null, tags: new Map(), keeps: [] }; bodies.push(b); } return b; };
   const results: StepResult[] = [];
@@ -239,7 +243,8 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
     return null;
   };
 
-  for (const st of steps) {
+  const run = (list: BuildStep[]): void => {
+  for (const st of list) {
     const res: StepResult = { id: st.id };
     cur = st.id;
     results.push(res);
@@ -475,8 +480,13 @@ function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results
       res.note = errText(e);
     }
   }
-
-  return { bodies: bodies.filter((b) => b.shape), results };
+  };
+  return { bodies, results, run, setScope: (s: Scope): void => { sc = s; }, forget: (id: string): void => { toolCache.delete(id); } };
+}
+function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results: StepResult[] } {
+  const r = makeRunner(steps, sc);
+  r.run(steps);
+  return { bodies: r.bodies.filter((b) => b.shape), results: r.results };
 }
 
 /** Rebuild every body for display and picking. */
@@ -490,22 +500,66 @@ export function buildModel(steps: BuildStep[]): BuildResult {
   }
 }
 
-/** The model, and the model with one more step on top, plus the volumes that step removes and adds. */
-export function buildDraft(steps: BuildStep[], draft: BuildStep): DraftResult {
-  const sc = new Scope();
+/** The last finished model, kept so a tool's preview only has to run its own step on top of it. */
+let draftCache: { key: string; sc: Scope; runner: ReturnType<typeof makeRunner>; base: BuildResult } | null = null;
+const cloneMesh = (m: BodyMesh): BodyMesh => ({ ...m, positions: m.positions.slice(), normals: m.normals.slice(), indices: m.indices.slice(), edgeLines: m.edgeLines.slice() });
+
+/**
+ * A tool's live preview: the model as it is (only built and sent when it changed), the volumes of the
+ * model with the tool applied, and the volumes the tool removes and adds. Fast: the model is built once and
+ * kept; each preview runs just the tool's step, and nothing is meshed except the changed volumes.
+ */
+export function buildDraft(steps: BuildStep[], draft: BuildStep, haveKey: string | null = null): DraftResult {
+  const key = JSON.stringify(steps);
+  if (!draftCache || draftCache.key !== key) {
+    if (draftCache) draftCache.sc.end();
+    draftCache = null;
+    const sc = new Scope(), runner = makeRunner(steps, sc);
+    runner.run(steps);
+    draftCache = { key, sc, runner, base: { bodies: runner.bodies.filter((b) => b.shape).map((b) => bodyResult(b, sc)), steps: runner.results.slice() } };
+  }
+  const c = draftCache, R = c.runner, dsc = new Scope();
+  const saved = R.bodies.map((b) => ({ b, shape: b.shape, tags: b.tags, keeps: b.keeps })), nBodies = R.bodies.length, nRes = R.results.length;
+  const baseShapes = R.bodies.filter((b) => b.shape).map((b) => ({ id: b.id, shape: b.shape! }));
   try {
-    const A = runSteps(steps, sc), B = runSteps(steps.concat([draft]), sc);
+    let bodies: { id: string; shape: Shape3D | null }[], step: StepResult;
+    if (draft.kind === 'pattern') {
+      // a pattern can move the original feature, so it runs on a fresh build of everything
+      const full = makeRunner(steps.concat([draft]), dsc);
+      full.run(steps.concat([draft]));
+      bodies = full.bodies; step = full.results[full.results.length - 1];
+    } else {
+      R.setScope(dsc);
+      R.run([draft]);
+      bodies = R.bodies; step = R.results[R.results.length - 1];
+    }
+    const out = bodies.filter((b) => b.shape);
     const removed: BodyMesh[] = [], added: BodyMesh[] = [];
     const diff = (x: Shape3D, y: Shape3D, into: BodyMesh[]): void => {
-      try { const r = x.cut(y); sc.add(r); if (measureVolume(r) > 1e-6) into.push(meshBody(r)); } catch { /* nothing to show */ }
+      try { const r = x.cut(y); dsc.add(r); if (measureVolume(r) > 1e-6) into.push(meshBody(r)); } catch { /* nothing to show */ }
     };
-    if (!B.results[B.results.length - 1].error) {
-      A.bodies.forEach((a) => { const b = B.bodies.find((x) => x.id === a.id); if (b) { diff(a.shape!, b.shape!, removed); diff(b.shape!, a.shape!, added); } else removed.push(meshBody(a.shape!)); });
-      B.bodies.forEach((b) => { if (!A.bodies.some((a) => a.id === b.id)) added.push(meshBody(b.shape!)); });
+    const volumes = out.map((b) => ({ id: b.id, volume: measureVolume(b.shape!), box: boxOf(b.shape!) }));
+    if (!step.error) {
+      const baseVol = new Map(c.base.bodies.map((b) => [b.id, b.volume]));
+      baseShapes.forEach((a) => {
+        const b = out.find((x) => x.id === a.id);
+        if (!b) { removed.push(meshBody(a.shape)); return; }
+        const dv = volumes.find((v) => v.id === a.id)!.volume - (baseVol.get(a.id) || 0), eps = 1e-6;
+        // a tool that only takes material away (or only adds) needs just one of the two differences
+        if (dv < -eps || Math.abs(dv) <= eps) diff(a.shape, b.shape!, removed);
+        if (dv > eps || Math.abs(dv) <= eps) diff(b.shape!, a.shape, added);
+      });
+      out.forEach((b) => { if (!baseShapes.some((a) => a.id === b.id)) added.push(meshBody(b.shape!)); });
     }
-    return { base: { bodies: A.bodies.map((b) => bodyResult(b, sc)), steps: A.results }, draft: { bodies: B.bodies.map((b) => bodyResult(b, sc)), steps: B.results }, removed, added };
+    const sendBase = haveKey !== key;
+    return { base: sendBase ? { bodies: c.base.bodies.map((b) => ({ ...b, mesh: cloneMesh(b.mesh) })), steps: c.base.steps } : null, baseKey: key, draft: { bodies: volumes, step }, removed, added };
   } finally {
-    sc.end();
+    saved.forEach((s) => { s.b.shape = s.shape; s.b.tags = s.tags; s.b.keeps = s.keeps; });
+    R.bodies.length = nBodies;
+    R.results.length = nRes;
+    R.forget(draft.id);
+    R.setScope(c.sc);
+    dsc.end();
   }
 }
 
