@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { $ } from '../core/dom';
 import { emit } from '../app/hub';
 import { refKey, state, type PickOpts } from '../app/state';
+import { frameFromFace } from '../model/frames';
 import type { PlaneRef } from '../model/types';
 import { message } from '../ui/message';
 import { pickablePlanes, type PlaneVis } from '../view/planes';
@@ -78,10 +79,13 @@ export function showPickTip(): void {
 }
 export function hidePickTip(): void { pickTip.style.display = 'none'; }
 
-/** A plane selected before the tool was started (select first, then tool). */
+/** A plane selected before the tool was started, or a selected flat body face used as one (select first, then tool). */
 export function selectedPlaneRef(): PlaneRef | null {
-  const s = state.selection.find((x) => x.kind === 'plane');
-  return s ? s.ref : null;
+  for (const s of state.selection) {
+    if (s.kind === 'plane') return s.ref;
+    if (s.kind === 'face' && s.planar) { const id = s.bodyId, b = state.bodies.find((x) => x.id === id); return { kind: 'face', frame: frameFromFace(s.n, s.p), bodyName: b ? b.name : 'body' }; }
+  }
+  return null;
 }
 
 export function planeName(ref: PlaneRef | null): string {

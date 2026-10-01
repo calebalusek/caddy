@@ -8,6 +8,7 @@ import { advanceSelect, deleteSketchSel, exitTool, hudEnter, hudShown, toolBusy,
 import { refreshSketchStyles } from '../sketch/visuals';
 import { commitDialog, escapeDialog, typeIntoDialog } from '../tools/dialog';
 import { cancelPick, clearSelection } from '../tools/pick';
+import { deleteSelectedFaces } from '../view/interaction';
 import { commandInputEmpty, isCommandInput, typeIntoCommand } from './cmdbar';
 import { message } from './message';
 
@@ -59,6 +60,7 @@ export function initKeyboard(): void {
       if (had) message('Selection cleared');
       return;
     }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && state.mode !== 'sketch' && state.selection.some((s) => s.kind === 'face')) { e.preventDefault(); deleteSelectedFaces(); return; }
     if (e.key === 'Enter' || e.key === ' ') {
       if (onButton) return;
       if (state.last) { e.preventDefault(); runCommand(state.last); }

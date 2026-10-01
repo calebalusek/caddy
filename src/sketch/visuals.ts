@@ -93,7 +93,7 @@ function loopPath<T extends THREE.Path>(L: Loop, s: T): T {
   else { s.moveTo(L.pts[0][0], L.pts[0][1]); for (let i = 1; i < L.pts.length; i++) s.lineTo(L.pts[i][0], L.pts[i][1]); s.closePath(); }
   return s;
 }
-function profileShape(pr: Profile): THREE.Shape {
+export function profileShape(pr: Profile): THREE.Shape {
   const s = loopPath(pr.loop, new THREE.Shape());
   pr.holes.forEach((h) => s.holes.push(loopPath(h, new THREE.Path())));
   return s;

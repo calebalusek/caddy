@@ -5,13 +5,16 @@ import * as THREE from 'three';
 import { $, cssv, esc, fmt } from '../core/dom';
 import { parseExpr } from '../core/expr';
 import { icon } from '../core/icons';
-import { emit } from '../app/hub';
+import { emit, on } from '../app/hub';
 import { regenerate } from '../app/regenerate';
+import { rebuildSolids } from '../app/solids';
 import { state } from '../app/state';
+import type { BuildStep } from '../kernel/protocol';
 import type { Feature } from '../model/types';
 import { message } from '../ui/message';
 import { makeMovable, placePanel } from '../ui/panel';
 import { arrowMat, camera, canvas, onFrame, previewEdgeMat, previewEdges, previewGroup, previewMat, previewMesh, scene, V3, vp, ZAX } from '../view/scene';
+import { finishSketch } from '../sketch/session';
 import { endPick, ray } from './pick';
 
 export interface FieldDef<P> {
@@ -55,6 +58,18 @@ export interface ToolDef<P = any> {
   /** Return true if Esc was used up (e.g. it only ended a pick). */
   onEscape?: (A: ActiveDialog<P>) => boolean;
   preview: (A: ActiveDialog<P>) => PreviewResult;
+  /** A build step for the kernel that previews this tool live on the body (fillet, chamfer). */
+  draftStep?: (A: ActiveDialog<P>) => BuildStep | null;
+  /** Mouse over the viewport while the menu is open: highlight what a click would pick. Return true if something is pickable. */
+  hover?: (A: ActiveDialog<P>) => boolean;
+  /** A click in the viewport while the menu is open. */
+  click?: (A: ActiveDialog<P>, e: PointerEvent) => void;
+  /** Something clicked in the Browser or History while the menu is open (standing rule 2). Return true if it was used. */
+  pickRef?: (A: ActiveDialog<P>, kind: string, id: string) => boolean;
+  /** The bodies were rebuilt while the menu is open. */
+  onBuilt?: (A: ActiveDialog<P>) => void;
+  /** The menu is closing: remove the tool's highlights. */
+  onClose?: (A: ActiveDialog<P>) => void;
   /** Create or update the feature. Return true to close the menu. */
   commit: (A: ActiveDialog<P>, params: P) => boolean;
 }
@@ -149,6 +164,7 @@ export function openDialog(type: string, editFeature?: Feature | null): void {
   if (!def) return;
   if (state.active) cancelDialog(true);
   if (state.pick) endPick();
+  if (state.mode === 'sketch') finishSketch(true);
   const params = editFeature ? cloneParams(editFeature.params) : def.defaults();
   const A: ActiveDialog = (state.active = { type, def, params, edit: editFeature || null });
   dialogEl.innerHTML = `
@@ -225,9 +241,28 @@ export function updatePreview(): void {
   } else { arrow.visible = false; dimEl.style.display = 'none'; }
   const ok = dialogEl.querySelector<HTMLButtonElement>('#okBtn');
   if (ok) ok.disabled = !res.ok;
+  // tools that preview on the real body (fillet, chamfer): rebuild shortly after the last change
+  if (A.def.draftStep) {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => { if (state.active === A) void rebuildSolids(); }, 70);
+  }
+}
+let draftTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Set a choice field from code (e.g. Join/Cut picked automatically). */
+export function setChoice(key: string, value: string): void {
+  dialogEl.querySelectorAll<HTMLInputElement>(`input[name="f-${key}"]`).forEach((i) => { i.checked = i.value === value; });
+}
+/** Set the small note under a field. */
+export function setHint(id: string, text: string): void {
+  const el = dialogEl.querySelector<HTMLElement>('#' + id);
+  if (el) el.textContent = text;
 }
 
 function closeDialog(): void {
+  const was = state.active;
+  clearTimeout(draftTimer);
+  if (was && was.def.onClose) was.def.onClose(was);
   state.active = null;
   state.hoverKey = null;
   dialogEl.remove();
@@ -288,6 +323,8 @@ export function typeIntoDialog(key: string): boolean {
 
 export function initDialogs(): void {
   makeMovable(dialogEl);
+  // the bodies were rebuilt: what the tool points at may have moved
+  on('built', () => { const A = state.active; if (!A) return; updateChips(); if (A.def.onBuilt) A.def.onBuilt(A); });
   dimEl.addEventListener('click', focusPrimary);
 
   dialogEl.addEventListener('input', (e) => {

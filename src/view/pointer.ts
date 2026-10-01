@@ -4,12 +4,12 @@ import { state } from '../app/state';
 import { sketchDragEnd, sketchDragMove, sketchDragStart, type SketchDrag } from '../sketch/tools';
 import { focusPrimary, handleDragMove, handleDragStart, overHandle, type HandleDrag } from '../tools/dialog';
 import { setPointer } from '../tools/pick';
-import { clickAt, doubleClickAt, hoverLeave, hoverMove } from './interaction';
+import { clickAt, doubleClickAt, hoverLeave, hoverMove, openViewportMenu } from './interaction';
 import { cam, camera, canvas, V3 } from './scene';
 import { stopAnimation } from './views';
 
 type Ptr =
-  | { mode: 'orbit' | 'pan'; x: number; y: number; moved: boolean }
+  | { mode: 'orbit' | 'pan'; x: number; y: number; moved: boolean; button: number }
   | { mode: 'handle'; drag: HandleDrag }
   | { mode: 'skdrag'; drag: SketchDrag };
 
@@ -27,7 +27,7 @@ export function initPointer(): void {
       const sd = sketchDragStart(e);
       if (sd) { ptr = { mode: 'skdrag', drag: sd }; return; }
     }
-    ptr = { mode: e.button === 0 && !e.shiftKey ? 'orbit' : 'pan', x: e.clientX, y: e.clientY, moved: false };
+    ptr = { mode: e.button === 0 && !e.shiftKey ? 'orbit' : 'pan', x: e.clientX, y: e.clientY, moved: false, button: e.button };
   });
   canvas.addEventListener('pointermove', (e) => {
     setPointer(e);
@@ -60,6 +60,8 @@ export function initPointer(): void {
     if (was.mode === 'skdrag') { sketchDragEnd(was.drag); return; }
     if (was.moved) return;
     setPointer(e);
+    // right-click (without dragging) opens the menu for whatever is under the cursor
+    if (was.button === 2) { if (state.mode !== 'sketch' && !state.active && !state.pick) openViewportMenu(e); return; }
     clickAt(e);
     if (!state.tool) hoverMove(e);
   });

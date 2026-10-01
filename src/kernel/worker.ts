@@ -1,8 +1,8 @@
 // Geometry worker: loads OpenCascade (WebAssembly) off the UI thread and answers requests.
 import opencascade from 'replicad-opencascadejs';
 import wasmUrl from 'replicad-opencascadejs/wasm?url';
-import { attachKernel, testBox } from './ops';
-import type { BodyMesh, KernelRequest, KernelResponse } from './protocol';
+import { attachKernel, buildModel, testBox } from './ops';
+import type { BodyMesh, BuildStep, KernelRequest, KernelResponse } from './protocol';
 
 const loading = (opencascade as (opts: object) => Promise<unknown>)({ locateFile: () => wasmUrl }).then(attachKernel);
 
@@ -17,7 +17,12 @@ function run(req: KernelRequest): { result: unknown; transfer: Transferable[] } 
       const mesh = testBox(w, d, h);
       return { result: mesh, transfer: meshBuffers(mesh) };
     }
+    case 'build': {
+      const result = buildModel(req.args[0] as BuildStep[]);
+      return { result, transfer: result.bodies.flatMap((b) => meshBuffers(b.mesh)) };
+    }
   }
+  throw new Error('Unknown kernel request: ' + req.op);
 }
 
 self.onmessage = async (e: MessageEvent<KernelRequest>) => {

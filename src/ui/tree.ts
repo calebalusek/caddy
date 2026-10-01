@@ -62,6 +62,8 @@ const openCtx = (ref: string, x: number, y: number, opener: HTMLElement): void =
  * Returns true if the click was used by the tool.
  */
 function toolPick(kind: string, id: string): boolean {
+  const A = state.active;
+  if (A && !state.pick && A.def.pickRef) return A.def.pickRef(A, kind, id);
   if (!state.pick) return false;
   let ref: PlaneRef | null = null;
   if (kind === 'origin' && (id === 'XY' || id === 'XZ' || id === 'YZ')) ref = { kind: 'origin', id: id as OriginPlaneId };

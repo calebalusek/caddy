@@ -1,6 +1,6 @@
 // App state: the document (features, bodies) plus what the user is doing right now.
 import { storage } from '../core/dom';
-import { newCounters, type Body, type Counters, type Feature, type FeatureType, type PlaneRef, type SketchFeature } from '../model/types';
+import { newCounters, type Body, type Counters, type Feature, type FeatureType, type PlaneRef, type SketchFeature, type Vec3 } from '../model/types';
 import type { P2 } from '../sketch/model';
 import type { ActiveDialog } from '../tools/dialog';
 
@@ -33,7 +33,10 @@ export interface SketchTool {
 export interface TrackPoint { key: string; p: P2; ref: { kind: 'pt'; id: string } | { kind: 'mid'; l: string } | null }
 
 /** Something selected in the viewport outside of any tool (select first, then tool). */
-export type Selection = { kind: 'plane'; key: string; ref: PlaneRef };
+export type Selection =
+  | { kind: 'plane'; key: string; ref: PlaneRef }
+  | { kind: 'face'; key: string; bodyId: string; faceId: number; planar: boolean; n: Vec3; p: Vec3; surf: string }
+  | { kind: 'edge'; key: string; bodyId: string; edgeId: number };
 
 export interface DocInfo {
   id: string;

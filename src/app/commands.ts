@@ -66,13 +66,13 @@ export function renderDocName(): void {
 
 export const COMMANDS: Command[] = [
   C('sketch', 'Create sketch', 'SK', 'solid', 'create', 'sketch', ['sketch', 'new sketch', 'draw'], () => startSketchPick(null)),
-  C('extrude', 'Extrude', 'EX', 'solid', 'create', 'extrude', ['extrude', 'ext', 'pull', 'push', 'boss', 'pad', 'cut', 'pocket'], 3),
+  C('extrude', 'Extrude', 'EX', 'solid', 'create', 'extrude', ['extrude', 'ext', 'pull', 'push', 'boss', 'pad', 'cut', 'pocket'], () => openDialog('extrude')),
   C('revolve', 'Revolve', 'REV', 'solid', 'create', 'revolve', ['revolve', 'lathe', 'spin', 'turn'], 5),
   C('sweep', 'Sweep', 'SW', 'solid', 'create', 'sweep', ['sweep', 'pipe', 'tube', 'follow path', 'rail'], 6),
   C('hole', 'Hole', 'HO', 'solid', 'create', 'hole', ['hole', 'bore', 'drill', 'counterbore', 'countersink'], 5),
   C('thread', 'Thread', 'TH', 'solid', 'create', 'thread', ['thread', 'screw', 'bolt', 'nut']),
-  C('fillet', 'Fillet', 'F', 'solid', 'modify', 'fillet', ['fillet', 'round', 'radius', 'round edge'], 3),
-  C('chamfer', 'Chamfer', 'CHA', 'solid', 'modify', 'chamfer', ['chamfer', 'bevel', 'break edge'], 3),
+  C('fillet', 'Fillet', 'F', 'solid', 'modify', 'fillet', ['fillet', 'round', 'radius', 'round edge'], () => openDialog('fillet')),
+  C('chamfer', 'Chamfer', 'CHA', 'solid', 'modify', 'chamfer', ['chamfer', 'bevel', 'break edge'], () => openDialog('chamfer')),
   C('shell', 'Shell', 'SH', 'solid', 'modify', 'shell', ['shell', 'hollow'], 7),
   C('patrect', 'Rectangular pattern', 'PTR', 'solid', 'modify', 'pattern', ['pattern', 'array', 'grid'], 7),
   C('patcirc', 'Circular pattern', 'PTC', 'solid', 'modify', 'pattern', ['pattern', 'polar array', 'circular', 'bolt circle'], 7),

@@ -47,7 +47,7 @@ function removeFeatures(list: Feature[]): void {
   if (state.sketch && ids.has(state.sketch.id)) dropSketchSession();
   state.features = state.features.filter((f) => !ids.has(f.id));
   state.bodies = state.bodies.filter((b) => state.features.some((f) => bodyIdsOf(f).includes(b.id)));
-  state.selection = state.selection.filter((s) => !(s.ref.kind === 'plane' && ids.has(s.ref.id)));
+  state.selection = state.selection.filter((s) => !(s.kind === 'plane' && s.ref.kind === 'plane' && ids.has(s.ref.id)));
   if (state.treeSel && ids.has(state.treeSel)) state.treeSel = null;
   if (state.selected && ids.has(state.selected.sketchId)) state.selected = null;
   clearHoverLines();

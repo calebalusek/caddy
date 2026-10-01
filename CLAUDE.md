@@ -26,6 +26,9 @@ parts for **3D printing**. Built for the owner and other people to use.
   - **Step 2 done**: sketcher (`src/sketch/`): solver, tools, snaps, tracking, dimensions,
     constraints, offset/move/trim, ported from the prototype. Profiles are now exact
     (`src/sketch/profiles.ts`): lines, arcs and circles split each other and keep true arc edges.
+  - **Step 3 done**: bodies on the real kernel. `src/kernel/model.ts` builds every body from the
+    timeline (exact B-rep), `src/app/solids.ts` runs it in the worker, `src/view/bodies.ts` shows
+    it. Extrude (regions, press-pull, auto Join/Cut/New body) and Fillet/Chamfer (live preview).
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised
@@ -36,6 +39,12 @@ parts for **3D printing**. Built for the owner and other people to use.
 - `src/view/` three.js scene. It keeps the prototype's r128 color pipeline on purpose
   (`ColorManagement` off, light intensities × π) so the approved Design-view look is identical.
 - `src/styles/app.css` is the prototype's CSS; rebuild-only rules go at the bottom.
+- Kernel lessons (learned by test, keep them): hole loops must run clockwise or the kernel adds
+  them instead of cutting; a too-big fillet throws, so it is caught and reported; round faces have
+  a "seam" edge that is dropped (not drawn, not pickable); kernel objects are freed by hand
+  (`Scope` in model.ts); face/edge ids change on every rebuild, so saved features point at edges
+  geometrically (`src/kernel/match.ts`, same format as version 1 files).
+- Editing a feature rolls the timeline back to just before it while its menu is open.
 - Deliberate differences from the prototype: hovering a plane is orange (rule 1; the prototype used
   blue), the toolbar button stays lit only while its tool is open, the Origin group opens by itself
   while a tool asks for a plane, the geometry engine loads in the background.

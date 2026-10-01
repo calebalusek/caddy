@@ -5,6 +5,7 @@ import { analyze } from '../sketch/solver';
 import { buildSketchVisual, liveSketchIds, removeSketchVisual } from '../sketch/visuals';
 import { syncPlaneFeatures } from '../view/planes';
 import { emit } from './hub';
+import { rebuildSolids } from './solids';
 import { featById, state } from './state';
 
 /** The frame a plane reference points at right now; null if what it refers to is gone or broken. */
@@ -44,4 +45,5 @@ export function regenerate(): void {
   syncPlaneFeatures();
   emit('doc');
   markDirty();
+  void rebuildSolids();
 }

@@ -1,23 +1,96 @@
-// Messages between the UI thread and the geometry worker.
+// Messages between the UI thread and the geometry worker. Plain data only.
+import type { Frame, Vec3 } from '../model/types';
+import type { Edge2 } from '../sketch/profiles';
+import type { P2 } from '../sketch/model';
+
+/** A closed boundary in sketch coordinates: exact lines and arcs, or one full circle. */
+export type LoopSpec = { edges: Edge2[] } | { circle: { c: P2; r: number } };
+/** A region on a plane: outer boundary and holes. */
+export interface ProfileSpec { frame: Frame; outer: LoopSpec; holes: LoopSpec[] }
+/** A flat face of an existing body used as the profile (press-pull). */
+export interface FaceSpec { bodyId: string; n: Vec3; w: number; p: Vec3; surf?: string }
+
+/** How a saved feature points at a body edge. Geometric, the same as in version 1 files. */
+export type EdgeRef =
+  | { kind?: 'line'; bodyId: string; a: Vec3; b: Vec3; n1: Vec3; n2: Vec3 }
+  | { kind: 'round'; bodyId: string; center: Vec3; axis: Vec3; R: number; closed: boolean; mid: Vec3; sr?: unknown; pts?: Vec3[] };
+
+export type Operation = 'Join' | 'Cut' | 'New body';
+
+export type BuildStep =
+  | {
+      kind: 'extrude';
+      id: string;
+      profile: ProfileSpec | null;
+      face: FaceSpec | null;
+      /** Start along the plane normal, and thickness. */
+      z0: number;
+      depth: number;
+      operation: Operation;
+      bodyId: string | null;
+    }
+  | { kind: 'fillet'; id: string; mode: 'fillet' | 'chamfer'; r: number; edges: EdgeRef[] };
+
+export interface FaceInfo {
+  id: number;
+  /** "<feature id>:<role>": which feature made this face. Fillet faces are "F:<fillet id>:<edge index>". */
+  surf: string;
+  planar: boolean;
+  /** Outward normal and a point on the face (planar faces: exact; curved: at the face's middle). */
+  n: Vec3;
+  p: Vec3;
+  area: number;
+}
+
+export interface EdgeInfo {
+  id: number;
+  kind: 'line' | 'round' | 'other';
+  a: Vec3;
+  b: Vec3;
+  mid: Vec3;
+  /** Round edges (circles and circular arcs). */
+  center?: Vec3;
+  axis?: Vec3;
+  R?: number;
+  closed?: boolean;
+  /** The two faces that meet at this edge, and their outward normals at its middle. */
+  faces: number[];
+  n1: Vec3;
+  n2: Vec3;
+}
 
 /** Triangles and edge lines for one body, with face/edge identity kept. */
 export interface BodyMesh {
   positions: Float32Array;
   normals: Float32Array;
   indices: Uint32Array;
-  /** Triangle index ranges per B-rep face: [start, count, faceId]. */
+  /** Index ranges per B-rep face. */
   faceGroups: { start: number; count: number; faceId: number }[];
   /** Line-segment vertex positions (pairs of points). */
   edgeLines: Float32Array;
-  /** Segment-vertex ranges per B-rep edge: [start, count, edgeId]. */
+  /** Segment-vertex ranges per B-rep edge. */
   edgeGroups: { start: number; count: number; edgeId: number }[];
   volume: number;
 }
 
+export interface BodyResult {
+  id: string;
+  mesh: BodyMesh;
+  faces: FaceInfo[];
+  edges: EdgeInfo[];
+  volume: number;
+  box: [Vec3, Vec3];
+}
+
+export interface StepResult { id: string; error?: boolean; note?: string; box?: [Vec3, Vec3] }
+export interface BuildResult { bodies: BodyResult[]; steps: StepResult[] }
+
 export interface KernelOps {
   ping: { args: []; result: 'ready' };
-  /** Step 0 proof: a w × d × h box, corner at the origin. */
+  /** A w × d × h box with a corner at the origin (self-test). */
   testBox: { args: [w: number, d: number, h: number]; result: BodyMesh };
+  /** Rebuild every body from the timeline. */
+  build: { args: [steps: BuildStep[]]; result: BuildResult };
 }
 
 export type OpName = keyof KernelOps;
