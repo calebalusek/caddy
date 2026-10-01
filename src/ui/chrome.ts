@@ -1,6 +1,7 @@
 // Top bar and viewport chrome: theme, device mode, File menu, project name, Design/Render switch, tips.
 import { $, root, storage } from '../core/dom';
 import { icon } from '../core/icons';
+import { currentHints, detectDevice, type Device } from '../core/device';
 import { getUnit, setUnitValue, type Unit } from '../core/units';
 import { renderDocName, runCommand, startDocRename } from '../app/commands';
 import { emit } from '../app/hub';
@@ -27,18 +28,18 @@ function initTheme(): void {
   apply();
 }
 
-// Placeholder: each mode gets its own settings. The tablet values are where iPad behavior plugs in
-// once the desktop version is final.
+// Desktop: mouse, keyboard and the command line. iPad: bigger touch targets, an on-screen number pad, drag-to-adjust
+// numbers, and a Browser panel that can be put away. Fingers and the Pencil work in both (see view/pointer.ts).
 const DEVICE_SETTINGS = {
-  desktop: { label: 'Desktop', touchTargets: 32, gestures: false, pencilSketching: false, commandLine: true },
-  tablet: { label: 'iPad', touchTargets: 44, gestures: true, pencilSketching: true, commandLine: 'on-demand' },
+  desktop: { label: 'Desktop' },
+  tablet: { label: 'iPad' },
 } as const;
-type Device = keyof typeof DEVICE_SETTINGS;
 
 function initDevice(): void {
   const apply = (mode: string): void => {
     const m: Device = mode in DEVICE_SETTINGS ? (mode as Device) : 'desktop';
     state.device = m;
+    emit('mode');
     root.setAttribute('data-device', m);
     document.querySelectorAll<HTMLElement>('#devSwitch button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.device === m)));
     storage.set('caddy-device', m);
@@ -49,10 +50,16 @@ function initDevice(): void {
     if (!b) return;
     apply(b.dataset.device!);
     message(b.dataset.device === 'tablet'
-      ? 'iPad mode is a placeholder for now. Touch gestures, larger controls and Apple Pencil sketching will be added once the desktop version is finished.'
+      ? 'iPad mode: bigger controls and an on-screen number pad. One finger turns the view, two fingers pan and zoom, the Pencil draws.'
       : 'Desktop mode: mouse, keyboard and command line.');
   });
-  apply(storage.get('caddy-device') || 'desktop');
+  // an iPad opens in iPad mode by itself; a choice made with the switch is remembered
+  apply(storage.get('caddy-device') || detectDevice(currentHints()));
+  // iPad mode can put the Browser panel away to give the model the whole screen
+  const bt = document.getElementById('browserToggle');
+  const setBrowser = (open: boolean): void => { document.body.classList.toggle('no-browser', !open); bt?.setAttribute('aria-pressed', String(open)); storage.set('caddy-browser', open ? 'open' : 'closed'); };
+  bt?.addEventListener('click', () => setBrowser(document.body.classList.contains('no-browser')));
+  setBrowser(storage.get('caddy-browser') !== 'closed');
 }
 
 /** The mm / in switch at the top right. Lengths are stored in mm either way; this changes what is shown and typed. */

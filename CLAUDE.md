@@ -162,6 +162,14 @@ parts for **3D printing**. Built for the owner and other people to use.
     are always millimeters; the switch only changes what is shown and typed (`src/core/units.ts`:
     `fmtU`, `fmtLen`, `toUser`, `fromUser`) and the base grid (10 / 50 mm lines, or 0.5 / 2.5 in lines).
     Any new length field or message must go through those helpers, never a hard-coded " mm".
+16. **iPad**: one codebase, an "iPad" mode (the Desktop/iPad switch; an iPad picks it itself,
+    `core/device.ts`). Input lives in `view/pointer.ts`: 1 finger orbits (pans in a sketch), 2 fingers pan +
+    pinch-zoom + twist, quick 2-finger tap = Undo, 3-finger tap = fit, touch-and-hold = right-click, double-tap =
+    double-click; the Pencil is precise, draws by dragging in a sketch (down = first point, up = last), its side
+    button pans. Picking areas scale with the pointer (`pickScale()`). iPad mode adds big targets, a number pad
+    (`ui/keypad.ts`), drag-a-label-to-change-a-size (`ui/scrub.ts`), Undo/Esc/Enter buttons (`ui/touchbar.ts`) and a
+    hideable Browser. Files leave through the share sheet (Save to Files) / folder / download (`files/deliver.ts`).
+    Test touch with CDP (`Input.dispatchTouchEvent`, mouse events with `pointerType: 'pen'`), see `e2e/ipad.spec.ts`.
 9. **Safety with printers**: no G-code / slicer features yet (parked). If ever built, use proven
    engines, conservative per-printer profiles and a mandatory preview.
 
@@ -184,5 +192,4 @@ parts for **3D printing**. Built for the owner and other people to use.
 
 ## Parked ideas (do not start without the owner)
 - Built-in **slicer / G-code** and sending jobs to printers.
-- **iPad version** (planned after desktop is solid): same flows, touch-sized targets, Apple Pencil
-  sketching, and saving through the **Files app** (the save window should lead into Files).
+- (nothing else parked besides the slicer)

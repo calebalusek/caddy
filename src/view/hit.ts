@@ -4,7 +4,7 @@ import type { ProfileSel } from '../app/state';
 import type { BodyResult, EdgeInfo, FaceInfo } from '../kernel/protocol';
 import type { Vec3 } from '../model/types';
 import { profileFills, toScreen } from '../sketch/visuals';
-import { mouse, ray } from '../tools/pick';
+import { mouse, pickScale, ray } from '../tools/pick';
 import { edgeSegments, faceOfTriangle, visibleBodies, type BodyVis } from './bodies';
 import { camera, V3 } from './scene';
 
@@ -28,7 +28,7 @@ const occRay = new THREE.Raycaster();
  */
 export function edgeAtCursor(bodies: BodyResult[], tol = 0.6): EdgeHit | null {
   const meshes = visibleBodies().map((v) => v.mesh);
-  let best: EdgeHit | null = null, bd = 9;
+  let best: EdgeHit | null = null, bd = 9 * pickScale();
   const a = new V3(), b = new V3();
   bodies.forEach((body) => {
     if (!visibleBodies().some((v) => v.id === body.id)) return;

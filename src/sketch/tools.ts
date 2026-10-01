@@ -10,7 +10,7 @@ import { emit, on } from '../app/hub';
 import { state, type SketchTool, type SkSel } from '../app/state';
 import { toLocal } from '../model/frames';
 import type { SketchFeature } from '../model/types';
-import { mouse } from '../tools/pick';
+import { mouse, pickScale } from '../tools/pick';
 import { message } from '../ui/message';
 import { canvas, scene, V3, vp } from '../view/scene';
 import { dimGeom, dimText } from './dimgeom';
@@ -518,7 +518,7 @@ function showSnapMarker(sk: SketchFeature, sn: Snap | null): void {
 
 // ---- what is under the cursor ----
 export function hitSketch(sk: SketchFeature, raw: P2, w: V3): SkSel | null {
-  let best: SkSel | null = null, bd = 9;
+  let best: SkSel | null = null, bd = 9 * pickScale();
   [...usedPoints(sk), 'O'].forEach((id) => {
     const p = sk.pts[id], s = toScreen(tw(sk.frame!, p.x, p.y)), d = Math.hypot(s.x - mouse.x, s.y - mouse.y);
     if (d < bd) { bd = d; best = { kind: 'point', id }; }

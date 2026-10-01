@@ -12,6 +12,7 @@ import { cancelDialog } from '../tools/dialog';
 import { message } from '../ui/message';
 import { cam, captureView, V3 } from '../view/scene';
 import { animateTo, fitView, scenePoints, stopAnimation, VIEWS } from '../view/views';
+import { defaultDest, downloadFile, offerShare, type Dest } from './deliver';
 import { parseProject, safeName, serializeProject, uniqueName, type ProjectFile } from './format';
 import { QUALITY, stlBytes, threeMFBytes, type MeshBody, type QualityName } from './meshfiles';
 import { store, type ProjectRecord } from './store';
@@ -156,14 +157,21 @@ export async function importFile(file: { name: string; text: () => Promise<strin
 }
 
 // ---- writing files ----
-type SaveResult = 'saved' | 'downloaded' | 'canceled' | 'failed';
+type SaveResult = 'saved' | 'shared' | 'downloaded' | 'canceled' | 'failed';
 /**
  * Write a file. Where the browser supports it (Chrome, Edge) this opens the real Save As window so the
  * user picks the folder; elsewhere it goes to the downloads folder. The picker must open straight from
  * the click, so the file's contents are produced after the user has chosen where it goes.
  */
-async function saveBytes(filename: string, make: () => Promise<Uint8Array | string>, mime: string, accept: Record<string, string[]>, desc: string): Promise<SaveResult> {
-  const pick = (window as any).showSaveFilePicker as undefined | ((o: unknown) => Promise<any>);
+async function saveBytes(filename: string, make: () => Promise<Uint8Array | string>, mime: string, accept: Record<string, string[]>, desc: string, dest: Dest = defaultDest()): Promise<SaveResult> {
+  if (dest === 'share') {
+    // build the file, then offer the share sheet (a Save to Files on an iPad)
+    try {
+      const r = await offerShare(filename, (await make()) as BlobPart, mime);
+      return r === 'shared' ? 'shared' : r === 'downloaded' ? 'downloaded' : r === 'canceled' ? 'canceled' : 'failed';
+    } catch { return 'failed'; }
+  }
+  const pick = dest === 'folder' ? ((window as any).showSaveFilePicker as undefined | ((o: unknown) => Promise<any>)) : undefined;
   if (typeof pick === 'function') {
     let handle: any = null;
     try { handle = await pick({ suggestedName: filename, types: [{ description: desc, accept }] }); }
@@ -174,23 +182,17 @@ async function saveBytes(filename: string, make: () => Promise<Uint8Array | stri
     }
   }
   try {
-    const data = await make();
-    const url = URL.createObjectURL(new Blob([data as BlobPart], { type: mime })), a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
-    return 'downloaded';
+    return downloadFile(filename, (await make()) as BlobPart, mime) ? 'downloaded' : 'failed';
   } catch { return 'failed'; }
 }
 export const hasSavePicker = (): boolean => typeof (window as any).showSaveFilePicker === 'function';
 
-export async function saveToFile(name?: string): Promise<void> {
+export async function saveToFile(name?: string, dest?: Dest): Promise<void> {
   const filename = safeName(name || state.doc.name) + '.caddy.json';
-  const r = await saveBytes(filename, async () => JSON.stringify(projectFile(), null, 1), 'application/json', { 'application/json': ['.json'] }, 'CADDY project');
+  const r = await saveBytes(filename, async () => JSON.stringify(projectFile(), null, 1), 'application/json', { 'application/json': ['.json'] }, 'CADDY project', dest);
   if (r === 'canceled') message('Save canceled');
   else if (r === 'failed') message("Couldn't save a file here. Your work is still autosaved in this browser.", 'warn');
-  else message(r === 'saved' ? `Saved ${filename}` : `Saved ${filename} to your downloads folder. Open it later with File › Open file, or drag it onto CADDY.`, 'ok');
+  else message(r === 'saved' ? `Saved ${filename}` : r === 'shared' ? `Shared ${filename}. Open it later with File › Open file.` : `Saved ${filename} to your downloads folder. Open it later with File › Open file, or drag it onto CADDY.`, 'ok');
 }
 
 export type ExportFormat = 'stl' | '3mf' | 'step';
@@ -216,7 +218,7 @@ export function exportMeshes(quality: QualityName, bodies: { id: string; name: s
 }
 export const clearExportCache = (): void => meshCache.clear();
 
-export async function exportFile(fmt: ExportFormat, name: string, quality: QualityName): Promise<void> {
+export async function exportFile(fmt: ExportFormat, name: string, quality: QualityName, dest?: Dest): Promise<void> {
   if (state.mode === 'sketch') { message('Finish the sketch first, then export', 'warn'); return; }
   if (state.active) cancelDialog(true);
   const bodies = exportBodies();
@@ -236,11 +238,11 @@ export async function exportFile(fmt: ExportFormat, name: string, quality: Quali
     step: ['application/step', { 'application/step': ['.step', '.stp'] }, 'STEP file'],
   };
   const [mime, accept, desc] = types[fmt];
-  const r = await saveBytes(file, make, mime, accept, desc);
+  const r = await saveBytes(file, make, mime, accept, desc, dest);
   const n = bodies.length, what = `${n} bod${n > 1 ? 'ies' : 'y'}` + (fmt === 'step' ? ', exact geometry, mm' : `, ${tris.toLocaleString()} triangles, mm`);
   if (r === 'canceled') message('Export canceled');
   else if (r === 'failed') message(`Couldn't build the ${fmt.toUpperCase()} file`, 'warn');
-  else message(`Exported ${file} (${what})` + (r === 'downloaded' ? ' to your downloads folder' : ''), 'ok');
+  else message(`${r === 'shared' ? 'Shared' : 'Exported'} ${file} (${what})` + (r === 'downloaded' ? ' to your downloads folder' : ''), 'ok');
 }
 
 // ---- library ----

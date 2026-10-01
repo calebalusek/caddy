@@ -163,7 +163,7 @@ onFrame(() => {
 function fieldHTML<P>(f: FieldDef<P>, params: any, editing: boolean): string {
   if (f.kind === 'length') {
     const isLen = !f.unit || f.unit === 'mm';
-    return `<div class="field" data-field="${f.key}"><label for="f-${f.key}">${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}"${isLen ? ' data-len="1"' : ''} class="len-input${f.primary ? ' primary' : ''}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${isLen ? fmtLen(params[f.key] || 0) : fmt(params[f.key] || 0)}" aria-describedby="h-${f.key}"><span class="unit"${isLen ? ' data-unit-label="1"' : ''}>${isLen ? unitName() : f.unit}</span></div><div class="fhint" id="h-${f.key}"></div></div>`;
+    return `<div class="field" data-field="${f.key}"><label for="f-${f.key}"${isLen ? ' data-scrub="1"' : ''}>${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}"${isLen ? ' data-len="1"' : ''} class="len-input${f.primary ? ' primary' : ''}" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${isLen ? fmtLen(params[f.key] || 0) : fmt(params[f.key] || 0)}" aria-describedby="h-${f.key}"><span class="unit"${isLen ? ' data-unit-label="1"' : ''}>${isLen ? unitName() : f.unit}</span></div><div class="fhint" id="h-${f.key}"></div></div>`;
   }
   if (f.kind === 'text')
     return `<div class="field" data-field="${f.key}"><label for="f-${f.key}">${f.label}</label><div class="len"><input id="f-${f.key}" data-key="${f.key}" class="txt-input" type="text" autocomplete="off" spellcheck="false" maxlength="200" value="${esc(String(params[f.key] ?? ''))}" placeholder="${esc(f.note || '')}"></div></div>`;

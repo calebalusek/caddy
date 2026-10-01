@@ -19,7 +19,7 @@ import { edgeAtCursor, profileAtCursor } from '../view/hit';
 import { v3 } from '../view/planes';
 import { focusPrimary, registerTool, setChoice, setHint, updateChips, updatePreview, type ActiveDialog } from './dialog';
 import { autoProfile } from './extrude';
-import { mouse } from './pick';
+import { mouse, pickScale } from './pick';
 
 interface RevolveParams {
   sketchId: string | null;
@@ -38,7 +38,7 @@ const axisOf = (P: RevolveParams): ReturnType<typeof axisWorld> => axisWorld(sta
 
 /** The axis a click would pick: a sketch line, an origin axis or a straight body edge near the cursor. */
 function axisAtCursor(): { ref: AxisRef; segs: [Vec3, Vec3][] } | null {
-  let best: { ref: AxisRef; segs: [Vec3, Vec3][] } | null = null, bd = 9;
+  let best: { ref: AxisRef; segs: [Vec3, Vec3][] } | null = null, bd = 9 * pickScale();
   const segD = (a: Vec3, b: Vec3): number => {
     const pa = toScreen(v3(a)), pb = toScreen(v3(b));
     if (pa.behind || pb.behind) return Infinity;

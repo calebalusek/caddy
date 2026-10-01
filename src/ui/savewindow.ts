@@ -5,7 +5,8 @@ import { esc, storage } from '../core/dom';
 import { icon } from '../core/icons';
 import { addDate, bumpVersion } from '../files/format';
 import type { QualityName } from '../files/meshfiles';
-import { clearExportCache, exportBodies, exportFile, exportMeshes, exportSelectionOnly, hasSavePicker, saveToFile, type ExportFormat } from '../files/project';
+import { DEST_KEY, availableDests, defaultDest, type Dest } from '../files/deliver';
+import { clearExportCache, exportBodies, exportFile, exportMeshes, exportSelectionOnly, saveToFile, type ExportFormat } from '../files/project';
 import { message } from './message';
 
 const QUALITY_KEY = 'caddy-export-quality';
@@ -32,13 +33,24 @@ export function openSaveWindow(kind: 'project' | 'export', fmt?: ExportFormat): 
       <div id="smQualityRow"><span class="flabel">Smoothness of curved faces</span><div class="seg-row sm-seg" role="radiogroup" aria-label="Smoothness">
       ${QUALITIES.map((q) => radio('smQ', q, q, q === quality0)).join('')}</div></div>` : ''}
     <div class="sm-info" id="smInfo"></div>
+    <span class="flabel">Where it goes</span><div class="seg-row sm-seg" id="smWhere" role="radiogroup" aria-label="Where it goes"></div>
     <div class="sm-dest" id="smDest"></div>
     <div class="sm-foot"><button class="btn" data-sm="cancel">Cancel</button><button class="btn primary" data-sm="save" id="smSave">Save</button></div>
   </div>`;
   document.body.appendChild(wrap);
   const q = <T extends HTMLElement>(s: string): T => wrap.querySelector<T>(s)!;
   const inp = q<HTMLInputElement>('#smName'), ext = q('#smExt'), info = q('#smInfo'), dest = q('#smDest'), saveBtn = q<HTMLButtonElement>('#smSave');
-  const picker = hasSavePicker();
+  // the ways this device can deliver the file: a folder (Save As window), the share sheet (Save to Files on an iPad), or a download
+  const dests = availableDests(), where = q('#smWhere'), tablet = state.device === 'tablet';
+  const LABEL: Record<Dest, string> = { folder: 'Choose a folder', share: tablet ? 'Files / Share' : 'Share…', download: 'Download' };
+  const NOTE: Record<Dest, string> = {
+    folder: "You'll choose the folder next.",
+    share: tablet ? 'A share sheet opens next: choose <b>Save to Files</b>, AirDrop, Mail, or open it in another app.' : 'A share sheet opens next, to send the file to another app or device.',
+    download: tablet ? "Saves to the Downloads folder (find it in the Files app)." : "Saves to your browser's download folder. To pick a folder every time, turn on <b>Ask where to save each file</b> in your browser's settings.",
+  };
+  const chosen0 = defaultDest();
+  where.innerHTML = dests.map((d) => radio('smDestPick', d, LABEL[d], d === chosen0)).join('');
+  const curDest = (): Dest => ((wrap.querySelector<HTMLInputElement>('input[name="smDestPick"]:checked') || { value: chosen0 }).value as Dest);
   const curFmt = (): ExportFormat | 'json' => (kind === 'export' ? ((wrap.querySelector<HTMLInputElement>('input[name="smFmt"]:checked') || { value: 'stl' }).value as ExportFormat) : 'json');
   const curQ = (): QualityName => ((wrap.querySelector<HTMLInputElement>('input[name="smQ"]:checked') || { value: quality0 }).value as QualityName);
   let alive = true;
@@ -61,8 +73,7 @@ export function openSaveWindow(kind: 'project' | 'export', fmt?: ExportFormat): 
     }
     const qr = wrap.querySelector<HTMLElement>('#smQualityRow');
     if (qr) qr.style.display = f === 'step' ? 'none' : '';
-    dest.innerHTML = picker ? `${icon('folder')}<span>You'll choose the folder next.</span>`
-      : `${icon('folder')}<span>Saves to your browser's download folder. To pick a folder every time, turn on <b>Ask where to save each file</b> in your browser's settings.</span>`;
+    dest.innerHTML = `${icon('folder')}<span>${NOTE[curDest()]}</span>`;
     const ok = inp.value.trim().length > 0;
     saveBtn.disabled = !ok;
     inp.classList.toggle('invalid', !ok);
@@ -71,11 +82,12 @@ export function openSaveWindow(kind: 'project' | 'export', fmt?: ExportFormat): 
   const doSave = (): void => {
     const nm = inp.value.trim();
     if (!nm) { inp.focus(); return; }
-    const f = curFmt(), ql = curQ();
+    const f = curFmt(), ql = curQ(), where = curDest();
     state.doc.saveNames = Object.assign({}, state.doc.saveNames, { [kind]: nm });
     if (kind === 'export') storage.set(QUALITY_KEY, ql);
+    storage.set(DEST_KEY, where);
     close();
-    if (f === 'json') void saveToFile(nm); else void exportFile(f, nm, ql);
+    if (f === 'json') void saveToFile(nm, where); else void exportFile(f, nm, ql, where);
   };
   const onKey = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); message('Save canceled'); }

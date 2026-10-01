@@ -17,7 +17,7 @@ import { setBoldSegments, setHoverEdge, setHoverFace, setSelectedFaces } from '.
 import { edgeAtCursor, faceAtCursor } from '../view/hit';
 import { v3 } from '../view/planes';
 import { focusPrimary, refreshHandle, registerTool, setHint, updateChips, updatePreview, openDialog, syncFields, type ActiveDialog } from './dialog';
-import { mouse } from './pick';
+import { mouse, pickScale } from './pick';
 
 type Dlg = ActiveDialog<PatternParams> & { lastKey?: string; pickMode?: 'copy' | 'e1' | 'e2' | 'v1' | 'v2' | 'axis' };
 const PATTERNABLE = new Set(['extrude', 'hole', 'revolve', 'sweep']);
@@ -72,7 +72,7 @@ function drawPicked(A: Dlg): void {
 
 /** The sketch circle nearest the cursor (within 9 px). */
 function circleAtCursor(): { c: Vec3; d: Vec3; r: number; segs: [Vec3, Vec3][] } | null {
-  let best: ReturnType<typeof circleAtCursor> = null, bd = 9;
+  let best: ReturnType<typeof circleAtCursor> = null, bd = 9 * pickScale();
   feats('sketch').forEach((s) => {
     if (!s.frame || !sketchGroupVisible(s)) return;
     s.curves.forEach((cv) => {

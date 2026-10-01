@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CADDY">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>CADDY</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
@@ -17,7 +22,7 @@
   <button class="docname" id="docName">Untitled part</button>
   <span class="savestate" id="saveState" aria-live="polite"></span><span class="kstate" id="kernelState" role="status" hidden></span>
   <span class="spacer"></span>
-  <span class="devnote" id="devNote">iPad mode: placeholder</span>
+  <button class="iconbtn browsertoggle" id="browserToggle" aria-pressed="true" aria-label="Show or hide the Browser panel" title="Show or hide the Browser panel"><svg viewBox="0 0 24 24" class="i" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="M9 5v14"/></svg></button>
   <div class="devswitch" id="devSwitch" role="group" aria-label="Device mode">
     <button type="button" data-device="desktop" aria-pressed="true" title="Desktop mode: mouse and keyboard"></button>
     <button type="button" data-device="tablet" aria-pressed="false" title="iPad mode: touch and Apple Pencil (coming later)"></button>

@@ -19,7 +19,7 @@ import { faceAtCursor, type FaceHit } from '../view/hit';
 import { v3 } from '../view/planes';
 import { hideInThumbnails, scene, V3 } from '../view/scene';
 import { focusPrimary, registerTool, setHint, updateChips, updatePreview, type ActiveDialog } from './dialog';
-import { mouse } from './pick';
+import { mouse, pickScale } from './pick';
 
 interface HoleParams {
   pts: HoleRef[];
@@ -57,7 +57,7 @@ function faceCands(fh: FaceHit): Vec3[] {
 }
 /** The critical point near the cursor, if any (within a few pixels). */
 function snapNear(fh: FaceHit): Vec3 | null {
-  let best: Vec3 | null = null, bd = SNAP_PX;
+  let best: Vec3 | null = null, bd = SNAP_PX * pickScale();
   faceCands(fh).forEach((q) => { const s = toScreen(v3(q)); if (s.behind) return; const dd = Math.hypot(s.x - mouse.x, s.y - mouse.y); if (dd < bd) { bd = dd; best = q; } });
   return best;
 }
@@ -119,7 +119,7 @@ function markerAt(A: Dlg): number {
     if (!pl) return;
     const s = toScreen(v3(pl.c));
     if (s.behind) return;
-    const rpx = Math.max(10, (A.params.d || 0) / 2 / worldPerPixel(v3(pl.c)) + 4), d = Math.hypot(s.x - mouse.x, s.y - mouse.y);
+    const rpx = Math.max(10 * pickScale(), (A.params.d || 0) / 2 / worldPerPixel(v3(pl.c)) + 4), d = Math.hypot(s.x - mouse.x, s.y - mouse.y);
     if (d < rpx && d < bd) { bd = d; best = k; }
   });
   return best;

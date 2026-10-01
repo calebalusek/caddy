@@ -20,7 +20,7 @@ import { selectedFlatFace } from '../view/interaction';
 import { v3 } from '../view/planes';
 import { focusPrimary, registerTool, setChoice, setHint, updateChips, updatePreview, type ActiveDialog } from './dialog';
 import { autoProfile } from './extrude';
-import { mouse } from './pick';
+import { mouse, pickScale } from './pick';
 
 interface SweepParams {
   sketchId: string | null;
@@ -68,7 +68,7 @@ const joinBody = (P: SweepParams): string | null => {
 
 /** The path curve nearest the cursor (within 9 px): the whole connected chain it belongs to. */
 function pathAtCursor(): PathRef | null {
-  let best: { sketchId: string; id: string; circle: boolean } | null = null, bd = 9;
+  let best: { sketchId: string; id: string; circle: boolean } | null = null, bd = 9 * pickScale();
   feats('sketch').forEach((s) => {
     if (!s.frame || !sketchGroupVisible(s)) return;
     s.curves.forEach((c) => {

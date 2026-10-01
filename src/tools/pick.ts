@@ -12,10 +12,13 @@ import { camera, canvas, vp } from '../view/scene';
 
 export const ray = new THREE.Raycaster();
 const ndc = new THREE.Vector2();
-/** Cursor position in viewport pixels. */
-export const mouse = { x: 0, y: 0 };
+/** Cursor position in viewport pixels, and what is pointing: a mouse, a finger or the Pencil. */
+export const mouse = { x: 0, y: 0, type: 'mouse' as string };
+/** How big picking areas are: a finger is blunt (twice the size), the Pencil is precise. */
+export const pickScale = (): number => (mouse.type === 'touch' ? 2 : mouse.type === 'pen' ? 0.85 : 1);
 
 export function setPointer(e: MouseEvent): void {
+  mouse.type = (e as PointerEvent).pointerType || 'mouse';
   const v = vp.getBoundingClientRect(), r = canvas.getBoundingClientRect();
   mouse.x = e.clientX - v.left;
   mouse.y = e.clientY - v.top;
