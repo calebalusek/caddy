@@ -10,6 +10,7 @@ import type { EdgeRef } from '../kernel/protocol';
 import { frameFromFace } from '../model/frames';
 import type { PlaneRef, SketchFeature } from '../model/types';
 import { curvePts } from '../sketch/model';
+import { materialsPick } from './render';
 import { enterSketch, selectSketch } from '../sketch/session';
 import { sketchClick, sketchMove } from '../sketch/tools';
 import { clearHoverLines, showHoverLines, sketchCenter, sketchGroupVisible, sketchWorldSegs, toScreen, tw } from '../sketch/visuals';
@@ -174,6 +175,7 @@ export function clickAt(e: PointerEvent): void {
   if (state.mode === 'sketch') { sketchClick(e); return; }
   const A = state.active;
   if (A) { if (A.def.click) A.def.click(A, e); return; }
+  if (materialsPick()) return; // the Materials panel is open: this click chooses the body
   const h = solidHit();
   if (!h) {
     if (state.treeSel) selectSketch(null);

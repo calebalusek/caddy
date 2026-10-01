@@ -33,15 +33,29 @@ export function updateCamera(): void {
 }
 
 // Design-view lighting: even ambient + sky/ground, a headlight that follows the camera, a small fixed fill.
-const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8782, 0.3 * LEGACY);
+export const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8782, 0.3 * LEGACY);
 hemi.position.set(0, 0, 1);
 scene.add(hemi);
-scene.add(new THREE.AmbientLight(0xffffff, 0.42 * LEGACY));
+export const ambient = new THREE.AmbientLight(0xffffff, 0.42 * LEGACY);
+scene.add(ambient);
 export const keyLight = new THREE.DirectionalLight(0xffffff, 0.5 * LEGACY);
 scene.add(keyLight, keyLight.target);
-const fill = new THREE.DirectionalLight(0xffffff, 0.12 * LEGACY);
+export const fill = new THREE.DirectionalLight(0xffffff, 0.12 * LEGACY);
 fill.position.set(-160, 120, 60);
 scene.add(fill);
+/** Render view: the sun that casts the soft shadow (off in the Design view). */
+export const sun = new THREE.DirectionalLight(0xffffff, 0);
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+/** Render view: the floor that catches the shadow. */
+export const ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.24 }));
+ground.receiveShadow = true;
+ground.visible = false;
+scene.add(ground);
 
 function gridGeo(step: number, extent: number, skip: number): THREE.BufferGeometry {
   const p: number[] = [];
@@ -88,6 +102,7 @@ const S = <T extends THREE.Material>(m: T): T => { sharedSet.add(m); return m; }
 export const planeEdgeMat = S(new THREE.LineBasicMaterial());
 export const bodyMat = S(new THREE.MeshStandardMaterial({ roughness: 0.68, metalness: 0, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
 export const edgeMat = S(new THREE.LineBasicMaterial({ toneMapped: false }));
+export const renderEdgeMat = S(new THREE.LineBasicMaterial({ toneMapped: false }));
 export const previewMat = S(new THREE.MeshStandardMaterial({ transparent: true, opacity: 0.5, depthWrite: false, roughness: 0.5, side: THREE.DoubleSide }));
 export const previewEdgeMat = S(new THREE.LineBasicMaterial({ transparent: true }));
 export const arrowMat = S(new THREE.MeshBasicMaterial({ depthTest: false, transparent: true, opacity: 0.92 }));
@@ -111,7 +126,8 @@ previewMesh.renderOrder = previewEdges.renderOrder = 3;
 previewGroup.add(previewMesh, previewEdges);
 
 export function applySceneTheme(): void {
-  scene.background = new THREE.Color(cssv('--vp-bg'));
+  scene.background = state.viewMode === 'render' ? renderBackground() : new THREE.Color(cssv('--vp-bg'));
+  renderEdgeMat.color.set(isDark() ? '#0B0D10' : '#23282E');
   gridMinorMat.color.set(cssv('--grid-minor'));
   gridMajorMat.color.set(cssv('--grid-major'));
   bodyMat.color.set(cssv('--body'));
@@ -123,8 +139,25 @@ export function applySceneTheme(): void {
 }
 on('theme', applySceneTheme);
 
+const isDark = (): boolean => { const t = document.documentElement.getAttribute('data-theme'); return t ? t === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches; };
+const bgTex: Record<string, THREE.CanvasTexture> = {};
+/** The Render view's backdrop: a soft top-to-bottom gradient. */
+function renderBackground(): THREE.CanvasTexture {
+  const key = isDark() ? 'd' : 'l';
+  if (bgTex[key]) return bgTex[key];
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 256;
+  const g = c.getContext('2d')!, gr = g.createLinearGradient(0, 0, 0, 256);
+  if (key === 'd') { gr.addColorStop(0, '#454C55'); gr.addColorStop(1, '#1B1F24'); } else { gr.addColorStop(0, '#F4F6F8'); gr.addColorStop(1, '#C4CBD3'); }
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return (bgTex[key] = t);
+}
+
 export function applyGridVisibility(): void {
   gridGroup.visible = state.gridOn && state.viewMode !== 'render';
+  originGroup.visible = state.viewMode !== 'render';
 }
 
 function resize(): void {

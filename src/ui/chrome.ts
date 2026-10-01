@@ -1,8 +1,8 @@
 // Top bar and viewport chrome: theme, device mode, File menu, project name, Design/Render switch, tips.
 import { $, root, storage } from '../core/dom';
 import { icon } from '../core/icons';
-import { byId, notReadyText, renderDocName, runCommand, startDocRename } from '../app/commands';
-import { emit, on } from '../app/hub';
+import { renderDocName, runCommand, startDocRename } from '../app/commands';
+import { emit } from '../app/hub';
 import { state } from '../app/state';
 import { message } from './message';
 import { openMenu } from './menu';
@@ -77,14 +77,7 @@ function initFileMenu(): void {
 }
 
 function initViewMode(): void {
-  $('#rmode').addEventListener('click', (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>('[data-m]');
-    if (!b) return;
-    if (b.dataset.m === 'render') message(notReadyText(byId('renderview')!));
-    else message('Design view');
-  });
-  // the sketch bar takes this spot while sketching
-  on('mode', () => { $('#rmode').hidden = state.mode === 'sketch'; });
+  // (the Design / Render switch is handled in view/render.ts)
 }
 
 export function initChrome(): void {

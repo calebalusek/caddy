@@ -6,7 +6,7 @@ import { on } from '../app/hub';
 import { state } from '../app/state';
 import type { BodyMesh, BodyResult, EdgeInfo, FaceInfo } from '../kernel/protocol';
 import type { Vec3 } from '../model/types';
-import { bodyMat, camera, cam, edgeMat, hideInThumbnails, onFrame, scene, V3, vp } from './scene';
+import { bodyMat, camera, cam, edgeMat, hideInThumbnails, onFrame, renderEdgeMat, scene, V3, vp } from './scene';
 
 const ghostMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.22, depthWrite: false, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 const ghostEdgeMat = new THREE.LineBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false });
@@ -34,15 +34,36 @@ export const allBodyVis = (): BodyVis[] => [...visById.values()];
 const isVisible = (id: string): boolean => { const b = state.bodies.find((x) => x.id === id); return !b || b.visible !== false; };
 export const visibleBodies = (): BodyVis[] => allBodyVis().filter((v) => isVisible(v.id));
 
+/** Render view: the material a body is made of (set by view/render.ts). */
+let renderMaterial: ((id: string) => THREE.Material) | null = null;
+export function setRenderMaterialProvider(fn: (id: string) => THREE.Material): void { renderMaterial = fn; }
+
 function applyLook(v: BodyVis): void {
   // other sketches ghost the bodies; a sketch on a body face keeps them solid
   const ghost = state.mode === 'sketch' && !(state.sketch && state.sketch.onFace);
-  v.mesh.material = ghost ? ghostMat : bodyMat;
-  v.lines.material = ghost ? ghostEdgeMat : edgeMat;
+  const R = state.viewMode === 'render' && !ghost && !!renderMaterial;
+  v.mesh.material = ghost ? ghostMat : R ? renderMaterial!(v.id) : bodyMat;
+  v.lines.material = ghost ? ghostEdgeMat : R ? renderEdgeMat : edgeMat;
+  v.lines.visible = !R || state.renderEdges;
+  v.mesh.castShadow = v.mesh.receiveShadow = R;
   v.group.visible = isVisible(v.id);
 }
 export function refreshBodyLooks(): void { visById.forEach(applyLook); }
 on('mode', refreshBodyLooks);
+on('view', refreshBodyLooks);
+
+/** Texture coordinates by projecting each face along its dominant axis (one texture tile ≈ 50 mm). */
+function boxUVs(P: Float32Array, N: Float32Array): Float32Array {
+  const uv = new Float32Array((P.length / 3) * 2), k = 1 / 50;
+  for (let i = 0; i < P.length / 3; i++) {
+    const ax = Math.abs(N[i * 3]), ay = Math.abs(N[i * 3 + 1]), az = Math.abs(N[i * 3 + 2]);
+    const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2];
+    if (az >= ax && az >= ay) { uv[i * 2] = x * k; uv[i * 2 + 1] = y * k; }
+    else if (ay >= ax) { uv[i * 2] = x * k; uv[i * 2 + 1] = z * k; }
+    else { uv[i * 2] = y * k; uv[i * 2 + 1] = z * k; }
+  }
+  return uv;
+}
 
 /** Replace what is shown with a fresh build result. */
 export function showBodies(results: BodyResult[]): void {
@@ -53,6 +74,7 @@ export function showBodies(results: BodyResult[]): void {
     geo.setAttribute('position', new THREE.BufferAttribute(data.mesh.positions, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(data.mesh.normals, 3));
     geo.setIndex(new THREE.BufferAttribute(data.mesh.indices, 1));
+    geo.setAttribute('uv', new THREE.BufferAttribute(boxUVs(data.mesh.positions, data.mesh.normals), 2)); // for wood, carbon, concrete…
     const mesh = new THREE.Mesh(geo, bodyMat);
     mesh.userData.bodyId = data.id;
     const lgeo = new THREE.BufferGeometry();

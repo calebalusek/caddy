@@ -84,6 +84,10 @@ export function refreshPlaneStyles(): void {
 on('select', refreshPlaneStyles);
 on('theme', refreshPlaneStyles);
 on('mode', refreshPlaneStyles);
+on('view', () => {
+  featureVis.forEach((v, id) => { const f = feats('plane').find((x) => x.id === id); v.group.visible = !!f && f.visible !== false && state.viewMode !== 'render' && !(state.active && state.active.edit === f); });
+  refreshPlaneStyles();
+});
 
 /** Corner points of visible offset planes, for zoom-to-fit. */
 export function planeFitPoints(): V3[] {

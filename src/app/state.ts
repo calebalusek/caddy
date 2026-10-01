@@ -90,6 +90,8 @@ export const state = {
   originPlanesVisible: false,
   gridOn: true,
   viewMode: 'design' as 'design' | 'render',
+  /** Render view: draw the black edge lines. */
+  renderEdges: true,
   device: 'desktop' as 'desktop' | 'tablet',
   doc: newDoc(),
 };

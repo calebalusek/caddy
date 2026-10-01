@@ -9,6 +9,7 @@ import { clearUndo, popUndo, pushUndo, restoreDoc, snapshotDoc } from './undo';
 import { cancelPick, endPick } from '../tools/pick';
 import { message } from '../ui/message';
 import { applyGridVisibility } from '../view/scene';
+import { setViewMode } from '../view/render';
 import { emit } from './hub';
 import { markDirty, regenerate } from './regenerate';
 import { bodyById, featById, state } from './state';
@@ -133,6 +134,7 @@ export function resetScene(): void {
   state.last = null;
   state.lastSketchId = null;
   state.originPlanesVisible = false;
+  if (state.viewMode === 'render') setViewMode('design', true);
   applyGridVisibility();
 }
 

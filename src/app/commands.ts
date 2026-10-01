@@ -11,6 +11,7 @@ import { finishSketch, lookAtSketch, startSketchPick } from '../sketch/session';
 import { setTool } from '../sketch/tools';
 import { openDialog } from '../tools/dialog';
 import { openPattern } from '../tools/pattern';
+import { openMatPanel, setViewMode } from '../view/render';
 import { endPick } from '../tools/pick';
 import { message } from '../ui/message';
 import { applyGridVisibility } from '../view/scene';
@@ -113,9 +114,9 @@ export const COMMANDS: Command[] = [
   C('front', 'Front view', 'FR', 'any', 'view', 'view', ['front', 'elevation'], () => setView('front')),
   C('right', 'Right view', 'RI', 'any', 'view', 'view', ['right', 'side view'], () => setView('right')),
   C('fit', 'Zoom to fit', 'ZE', 'any', 'view', 'view', ['zoom extents', 'fit', 'zoom all'], () => zoomFit()),
-  C('appearance', 'Appearance', 'AP', 'solid', 'print', 'appearance', ['appearance', 'material', 'materials', 'color', 'colour', 'paint', 'finish', 'texture', 'wood', 'metal'], 8),
-  C('renderview', 'Render view', 'RV', 'any', 'view', 'render', ['render', 'render view', 'realistic', 'photo', 'shaded'], 8),
-  C('designview', 'Design view', 'DV', 'any', 'view', 'view', ['design view', 'matte', 'modeling view'], () => message('Design view')),
+  C('appearance', 'Appearance', 'AP', 'solid', 'print', 'appearance', ['appearance', 'material', 'materials', 'color', 'colour', 'paint', 'finish', 'texture', 'wood', 'metal'], () => openMatPanel()),
+  C('renderview', 'Render view', 'RV', 'any', 'view', 'render', ['render', 'render view', 'realistic', 'photo', 'shaded'], () => setViewMode(state.viewMode === 'render' ? 'design' : 'render')),
+  C('designview', 'Design view', 'DV', 'any', 'view', 'view', ['design view', 'matte', 'modeling view'], () => setViewMode('design')),
   C('grid', 'Toggle grid', 'GR', 'any', 'view', 'grid', ['grid'], () => { state.gridOn = !state.gridOn; applyGridVisibility(); message(state.gridOn ? 'Grid shown' : 'Grid hidden'); }),
   C('origin', 'Toggle origin planes', 'ORI', 'any', 'view', 'origin', ['origin', 'origin planes'], () => toggleVis('origin')),
   C('undo', 'Undo', 'U', 'any', 'view', 'undo', ['undo', 'back'], () => undo()),
