@@ -126,6 +126,22 @@ export function stepFor(features: Feature[], f: Feature): BuildStep | null {
     const path = sweepPath(features, P.path);
     return { kind: 'sweep', id: f.id, profile, face: P.face || null, path: path.path || null, pathNote: path.err, orientation: P.orientation === 'Parallel' ? 'Parallel' : 'Perpendicular', corners: P.corners === 'Mitered' ? 'Mitered' : 'Round', operation: P.operation, bodyId: f.bodyId || null };
   }
+  if (f.type === 'combine') {
+    const P = f.params as any;
+    return { kind: 'combine', id: f.id, target: P.target || null, tools: P.tools || [], operation: P.operation === 'Cut' ? 'Cut' : P.operation === 'Intersect' ? 'Intersect' : 'Join', keepTools: P.keepTools === 'Keep' };
+  }
+  if (f.type === 'transform') {
+    const P = f.params as any, ax: Vec3 = P.rotAxis === 'X' ? [1, 0, 0] : P.rotAxis === 'Y' ? [0, 1, 0] : [0, 0, 1];
+    return { kind: 'transform', id: f.id, bodies: P.bodies || [], mode: P.mode === 'Lay a face down' ? 'lay' : 'free', move: [+P.x || 0, +P.y || 0, +P.z || 0], rotAxis: ax, rotDeg: +P.angle || 0, scale: (+P.scale || 100) / 100, pivot: P.pivot === 'Origin' ? 'origin' : 'body', copy: P.copy === 'Copy', lay: P.face || null, bodyIds: (f.bodyIds as string[]) || [] };
+  }
+  if (f.type === 'split') {
+    const P = f.params as any, fr = resolveRefIn(features, P.ref);
+    return { kind: 'split', id: f.id, body: P.body || null, plane: fr ? { o: fr.o, n: fr.n } : null, keys: P.keys || 'None', keySize: +P.keySize || 0, keyCount: +P.keyCount || 1, keyDepth: +P.keyDepth || 0, clearance: +P.clearance || 0, bodyIds: (f.bodyIds as string[]) || [] };
+  }
+  if (f.type === 'offsetbody') {
+    const P = f.params as any;
+    return { kind: 'offsetbody', id: f.id, bodies: P.bodies || [], distance: +P.distance || 0, sharp: P.corners !== 'Round', copy: P.result === 'New body', bodyIds: (f.bodyIds as string[]) || [] };
+  }
   if (f.type === 'thread') {
     const P = f.params as any;
     return P.face ? { kind: 'thread', id: f.id, face: P.face, pitch: P.size === 'Custom' ? +P.pitch || 0 : 0, depth: +P.depth || 0, length: +P.length || 0, hand: P.hand === 'Left' ? 'Left' : 'Right' } : null;

@@ -1,4 +1,4 @@
-// Rebuilding the bodies from the timeline. The kernel runs in a Web Worker, so this is asynchronous:
+﻿// Rebuilding the bodies from the timeline. The kernel runs in a Web Worker, so this is asynchronous:
 // the UI stays responsive and the bodies update when the result arrives.
 import { Kernel } from '../kernel/client';
 import type { BodyResult, BuildResult, BuildStep, DraftResult, PreviewBody } from '../kernel/protocol';
@@ -13,7 +13,7 @@ export type { ProfileParams };
 /** The sketch region a feature uses (see model/steps.ts). */
 export const findProfile = (sel: ProfileParams | null | undefined): ReturnType<typeof findProfileIn> => findProfileIn(state.features, sel);
 
-let shown: BuildResult = { bodies: [], steps: [] };
+let shown: BuildResult = { bodies: [], steps: [], consumed: [] };
 let base: BuildResult = shown;
 let draftShown: PreviewBody[] | null = null;
 let pending: Promise<void> = Promise.resolve();
@@ -28,6 +28,8 @@ export const shownBodies = (): BodyResult[] => shown.bodies;
 export const previewBodies = (): PreviewBody[] => draftShown || shown.bodies;
 /** The bodies before the tool being used: what its picks (edges, faces) refer to. */
 export const baseBodies = (): BodyResult[] => base.bodies;
+/** Bodies a Combine has used up: they are not in the model any more, so the Browser does not list them. */
+export const consumedBodies = (): string[] => shown.consumed;
 export const baseBody = (id: string): BodyResult | undefined => base.bodies.find((b) => b.id === id);
 
 let running = false, again = false;

@@ -28,6 +28,8 @@ export function collectWithDependents(roots: Feature[]): Feature[] {
     // copies of a body (mirror, pattern of bodies) depend on the features that make that body
     const made = new Set(list.flatMap(bodyIdsOf));
     if ((g.type === 'mirror' || g.type === 'pattern') && (p.bodies || []).some((id: string) => made.has(id))) { ids.add(g.id); list.push(g); return; }
+    const used: string[] = [].concat(p.bodies || [], p.tools || [], p.target || [], p.body || []);
+    if ((g.type === 'combine' || g.type === 'transform' || g.type === 'split' || g.type === 'offsetbody') && used.some((id) => made.has(id))) { ids.add(g.id); list.push(g); return; }
     if (((g.type === 'extrude' || g.type === 'revolve' || g.type === 'hole' || g.type === 'sweep') && usesSketch) || (r && r.kind === 'plane' && ids.has(r.id))) { ids.add(g.id); list.push(g); }
   });
   return list;

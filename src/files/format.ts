@@ -66,7 +66,7 @@ export function serializeProject(doc: { id: string; name: string; created: numbe
   };
 }
 
-const KNOWN = new Set(['sketch', 'plane', 'extrude', 'fillet', 'revolve', 'hole', 'sweep', 'shell', 'pattern', 'mirror', 'text', 'thread']);
+const KNOWN = new Set(['sketch', 'plane', 'extrude', 'fillet', 'revolve', 'hole', 'sweep', 'shell', 'pattern', 'mirror', 'text', 'thread', 'combine', 'transform', 'split', 'offsetbody']);
 
 /** Read a project file (version 1 or 2). Throws a plain-English error if it is not one. */
 export function parseProject(d: any): ProjectContent {

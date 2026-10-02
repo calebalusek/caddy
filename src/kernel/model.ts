@@ -1,4 +1,4 @@
-// Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
+﻿// Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
 // Runs wherever the kernel is loaded: the Web Worker in the app, Node in tests.
 import {
   genericSweep, makeHelix, getFont, Plane, sketchText, makeOffset, assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makePolygon, makeThreePointArc, makeVertex, revolution, measureArea, measureDistanceBetween, measureVolume, Vector,
@@ -12,6 +12,7 @@ import { matchEdge } from './match';
 import type { DraftResult, BodyMesh, BodyResult, BuildResult, BuildStep, EdgeInfo, FaceInfo, FaceSpec, LoopSpec, Operation, ProfileSpec, StepResult } from './protocol';
 import { DEPTH_K, grooveProfile, grooveSection, standardSize } from '../model/threads';
 import { patternRelocates, patternTransforms, type Xf } from '../model/pattern';
+import { offsetShape, splitBody } from './bodyops';
 import { Scope, tup } from './scope';
 import { thickSolid } from './shell';
 import { rawBoolean, sweepSolid, unifyKeeping, type Disk } from './sweep';
@@ -21,7 +22,7 @@ export const DISPLAY_QUALITY = { tolerance: 0.02, angularTolerance: 0.2 };
 
 const r4 = (v: number): number => Math.round(v * 1e4) / 1e4 + 0; // + 0 turns -0 into 0
 
-// ---- profiles → kernel faces ----
+// ---- profiles â†’ kernel faces ----
 function loopWire(frame: Frame, loop: LoopSpec, z: number, reversed: boolean, sc: Scope): Wire {
   const W = (p: P2): Vec3 => toWorld(frame, p[0], p[1], z);
   if ('circle' in loop) return assembleWire([sc.add(makeCircle(loop.circle.r, W(loop.circle.c), reversed ? vsc(frame.n, -1) : frame.n))]);
@@ -217,6 +218,8 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
   /** Every tool shape a feature made, so a pattern can copy it. A pattern that moves the original keeps it from being applied where it was. */
   interface ToolRec { op: Operation; bodyId: string | null; tool: Shape3D; toolTags: Map<string, string> }
   const toolCache = new Map<string, ToolRec[]>();
+  /** Bodies a Combine has used up. */
+  const consumed = new Set<string>();
   const suppressed = new Set<string>();
   steps.forEach((s) => { if (s.kind === 'pattern' && s.params.what === 'Features' && patternRelocates(s.params)) s.params.feats.forEach((id) => suppressed.add(id)); });
   let cur = '';
@@ -280,7 +283,7 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
         if (!st.profile) { res.error = true; res.note = 'its profile is gone'; continue; }
         if (!st.axis) { res.error = true; res.note = 'pick an axis to revolve around'; continue; }
         const ang = Math.min(360, Math.abs(st.angle));
-        if (ang < 0.01) { res.error = true; res.note = 'the angle needs to be more than 0°'; continue; }
+        if (ang < 0.01) { res.error = true; res.note = 'the angle needs to be more than 0Â°'; continue; }
         const fr = st.profile.frame, A = st.axis.A, d = vnorm(st.axis.d);
         if (Math.abs(vdot(d, fr.n)) > 1e-5 || Math.abs(vdot(fr.n, vsub(A, fr.o))) > 1e-3) { res.error = true; res.note = "the axis has to lie in the sketch's plane"; continue; }
         // the whole profile must sit on one side of the axis (touching it is fine)
@@ -320,6 +323,101 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
         sc.all(tool.faces).forEach((f) => { const sig = signature(f); if (!toolTags.has(sig)) toolTags.set(sig, st.id + ':w' + k++); });
         const bad = combine(st.operation, st.bodyId, tool, toolTags, tbox, st.id + ':x', r.keeps);
         if (bad) { res.error = true; res.note = bad; }
+      } else if (st.kind === 'combine') {
+        const T = st.target ? bodies.find((x) => x.id === st.target) : null;
+        if (!st.target) { res.error = true; res.note = 'click the body to keep'; continue; }
+        if (!T || !T.shape) { res.error = true; res.note = 'its first body is gone'; continue; }
+        if (!st.tools.length) { res.error = true; res.note = 'click the bodies to ' + (st.operation === 'Join' ? 'join to it' : st.operation === 'Cut' ? 'cut from it' : 'intersect with it'); continue; }
+        const tools = st.tools.map((id) => bodies.find((x) => x.id === id)).filter((x): x is BodyState => !!x && !!x.shape && x !== T);
+        if (tools.length < st.tools.length) { res.error = true; res.note = (st.tools.length - tools.length) + ' of its bodies are gone'; continue; }
+        let shape: Shape3D = T.shape, tags = T.tags, keeps = T.keeps.slice();
+        for (const tool of tools) {
+          keeps = keeps.concat(tool.keeps);
+          const op = st.operation === 'Join' ? 'fuse' : st.operation === 'Cut' ? 'cut' : 'common';
+          const out: Shape3D = keeps.length ? keep(unifyKeeping(sc.add(rawBoolean(op, shape, tool.shape!)), keeps, sc)) : keep(op === 'fuse' ? shape.fuse(tool.shape!) : op === 'cut' ? shape.cut(tool.shape!) : shape.intersect(tool.shape!));
+          if (!(measureVolume(out) > 1e-9)) { res.error = true; res.note = st.operation === 'Intersect' ? 'the bodies do not overlap' : 'nothing is left of the body'; break; }
+          tags = retag(out, tags, tool.tags, () => st.id + ':c', sc);
+          shape = out;
+        }
+        if (res.error) continue;
+        T.shape = shape; T.tags = tags; T.keeps = keeps;
+        if (!st.keepTools) tools.forEach((x) => { x.shape = null; consumed.add(x.id); });
+      } else if (st.kind === 'transform') {
+        const src = st.bodies.map((id) => bodies.find((x) => x.id === id)).filter((x): x is BodyState => !!x && !!x.shape);
+        if (!st.bodies.length) { res.error = true; res.note = 'click the bodies to move'; continue; }
+        if (src.length < st.bodies.length) { res.error = true; res.note = (st.bodies.length - src.length) + ' of its bodies are gone'; continue; }
+        if (!(st.scale > 0)) { res.error = true; res.note = 'the scale needs to be more than 0 %'; continue; }
+        let lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
+        src.forEach((b) => { const [l, h] = boxOf(b.shape!); lo = lo.map((v, i) => Math.min(v, l[i])) as Vec3; hi = hi.map((v, i) => Math.max(v, h[i])) as Vec3; });
+        const pivot: Vec3 = st.pivot === 'origin' ? [0, 0, 0] : [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+        let rot: { axis: Vec3; deg: number } | null = Math.abs(st.rotDeg) > 1e-9 ? { axis: st.rotAxis, deg: st.rotDeg } : null, scale = st.scale;
+        if (st.mode === 'lay') {
+          // turn the picked flat face to point down
+          const owner = st.lay ? src.find((x) => x.id === st.lay!.bodyId) : null;
+          if (!st.lay) { res.error = true; res.note = 'click the flat face to lay down'; continue; }
+          if (!owner) { res.error = true; res.note = 'the picked face is not on one of the bodies'; continue; }
+          const f = matchFace(owner.shape!, st.lay, owner.tags, sc);
+          if (!f) { res.error = true; res.note = 'its face is gone'; continue; }
+          if (f.geomType !== 'PLANE') { res.error = true; res.note = 'lay a flat face down'; continue; }
+          const fn = vnorm(tup(f.normalAt())), cr = vcross(fn, [0, 0, -1]), s = vlen(cr);
+          rot = s > 1e-9 ? { axis: vnorm(cr), deg: (Math.atan2(s, -fn[2]) * 180) / Math.PI } : fn[2] > 0 ? { axis: [1, 0, 0], deg: 180 } : null;
+          scale = 1;
+        }
+        const turned = src.map((b) => {
+          let r: Shape3D = b.shape!.clone();
+          if (scale !== 1) r = r.scale(scale, pivot);
+          if (rot) r = r.rotate(rot.deg, pivot, rot.axis);
+          return keep(r);
+        });
+        let move: Vec3 = st.move;
+        if (st.mode === 'lay') move = [0, 0, -Math.min(...turned.map((m) => boxOf(m)[0][2]))]; // down onto the build plate
+        let slot = 0, short = 0;
+        turned.forEach((m, i) => {
+          const b = src[i], out: Shape3D = vlen(move) > 1e-12 ? keep(m.clone().translate(move)) : m, tags = remapTags(b.shape!, out, b.tags, null, sc);
+          if (st.copy && st.mode !== 'lay') {
+            const nid = st.bodyIds[slot++];
+            if (!nid) { short++; return; }
+            const nb = body(nid);
+            nb.shape = out; nb.tags = new Map([...tags].map(([k, v]) => [k, st.id + '|' + v])); nb.keeps = [];
+          } else { b.shape = out; b.tags = tags; b.keeps = []; }
+        });
+        if (short) { res.error = true; res.note = 'its copies are not set up yet'; continue; }
+        if (st.mode === 'lay') { const h = Math.max(...turned.map((m) => boxOf(m)[1][2])) + move[2]; res.info = 'Laid on its face, ' + Math.round(h * 100) / 100 + ' mm tall'; }
+      } else if (st.kind === 'split') {
+        const b = st.body ? bodies.find((x) => x.id === st.body) : null;
+        if (!st.body) { res.error = true; res.note = 'click the body to split'; continue; }
+        if (!b || !b.shape) { res.error = true; res.note = 'its body is gone'; continue; }
+        if (!st.plane) { res.error = true; res.note = 'its splitting plane is gone'; continue; }
+        const nid = st.bodyIds[0];
+        if (!nid) { res.error = true; res.note = 'its new body is not set up yet'; continue; }
+        let r: ReturnType<typeof splitBody>;
+        try { r = splitBody(b.shape, st.plane, { type: st.keys, size: st.keySize, count: st.keyCount, depth: st.keyDepth, clearance: st.clearance }, sc); }
+        catch (e) { res.error = true; res.note = errText(e); continue; }
+        const cutTag = () => st.id + ':cut';
+        b.tags = retag(r.pos, b.tags, null, cutTag, sc);
+        const nb = body(nid);
+        nb.tags = retag(r.neg, new Map(), null, cutTag, sc);
+        nb.shape = r.neg; nb.keeps = [];
+        b.shape = r.pos; b.keeps = [];
+        res.info = r.info;
+      } else if (st.kind === 'offsetbody') {
+        const src = st.bodies.map((id) => bodies.find((x) => x.id === id)).filter((x): x is BodyState => !!x && !!x.shape);
+        if (!st.bodies.length) { res.error = true; res.note = 'click the bodies to offset'; continue; }
+        if (src.length < st.bodies.length) { res.error = true; res.note = (st.bodies.length - src.length) + ' of its bodies are gone'; continue; }
+        if (Math.abs(st.distance) < 1e-6) { res.error = true; res.note = 'the distance is 0'; continue; }
+        let slot = 0, bad = '';
+        for (const b of src) {
+          let out: Shape3D;
+          try { out = offsetShape(b.shape!, st.distance, st.sharp, sc); } catch { bad = st.distance < 0 ? 'that is more than the body can shrink by' : 'the geometry engine could not grow the body by that much'; break; }
+          if (!(measureVolume(out) > 1e-9)) { bad = 'that is more than the body can shrink by'; break; }
+          if (st.copy) {
+            const nid = st.bodyIds[slot++];
+            if (!nid) { bad = 'its copies are not set up yet'; break; }
+            const nb = body(nid);
+            nb.shape = out; nb.tags = retag(out, new Map(), null, () => st.id + ':o', sc); nb.keeps = [];
+          } else { b.tags = retag(out, new Map(), null, () => st.id + ':o', sc); b.shape = out; b.keeps = []; }
+        }
+        if (bad) { res.error = true; res.note = bad; continue; }
       } else if (st.kind === 'thread') {
         const b = bodies.find((x) => x.id === st.face.bodyId);
         if (!b || !b.shape) { res.error = true; res.note = 'its body is gone'; continue; }
@@ -562,7 +660,7 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
           const b = bodies.find((x) => x.id === bid);
           if (!b || !b.shape) { bad += ks.length; return; }
           const { infos } = edgeInfos(b.shape, sc);
-          const picked = new Map<number, number>(); // edge id → index in the feature's edge list
+          const picked = new Map<number, number>(); // edge id â†’ index in the feature's edge list
           ks.forEach((k) => { const e = matchEdge(infos, st.edges[k]); if (e) picked.set(e.id, k); else bad++; });
           if (!picked.size) return;
           const sizeOf = (e: Edge): number | null => (picked.has(e.hashCode) ? st.r : null);
@@ -584,20 +682,28 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
     }
   }
   };
-  return { bodies, results, run, setScope: (s: Scope): void => { sc = s; }, forget: (id: string): void => { toolCache.delete(id); } };
+  return { bodies, results, run, consumed, setScope: (s: Scope): void => { sc = s; }, forget: (id: string): void => { toolCache.delete(id); } };
 }
-function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results: StepResult[] } {
+function runSteps(steps: BuildStep[], sc: Scope): { bodies: BodyState[]; results: StepResult[]; consumed: string[] } {
   const r = makeRunner(steps, sc);
   r.run(steps);
-  return { bodies: r.bodies.filter((b) => b.shape), results: r.results };
+  return { bodies: r.bodies.filter((b) => b.shape), results: r.results, consumed: [...r.consumed] };
+}
+
+/** A copy's faces carry the original's tags (optionally marked), matched by their order. */
+function remapTags(orig: Shape3D, copy: Shape3D, tags: Map<string, string>, mark: string | null, sc: Scope): Map<string, string> {
+  const a = sc.all(orig.faces), b = sc.all(copy.faces), out = new Map<string, string>();
+  if (a.length !== b.length) return out;
+  a.forEach((f, i) => { const t = tags.get(signature(f)); if (t) out.set(signature(b[i]), mark ? mark + '|' + t : t); });
+  return out;
 }
 
 /** Rebuild every body for display and picking. */
 export function buildModel(steps: BuildStep[]): BuildResult {
   const sc = new Scope();
   try {
-    const { bodies, results } = runSteps(steps, sc);
-    return { bodies: bodies.map((b) => bodyResult(b, sc)), steps: results };
+    const { bodies, results, consumed } = runSteps(steps, sc);
+    return { bodies: bodies.map((b) => bodyResult(b, sc)), steps: results, consumed };
   } finally {
     sc.end();
   }
@@ -619,14 +725,15 @@ export function buildDraft(steps: BuildStep[], draft: BuildStep | null, haveKey:
     draftCache = null;
     const sc = new Scope(), runner = makeRunner(steps, sc);
     runner.run(steps);
-    draftCache = { key, sc, runner, base: { bodies: runner.bodies.filter((b) => b.shape).map((b) => bodyResult(b, sc)), steps: runner.results.slice() } };
+    draftCache = { key, sc, runner, base: { bodies: runner.bodies.filter((b) => b.shape).map((b) => bodyResult(b, sc)), steps: runner.results.slice(), consumed: [...runner.consumed] } };
   }
   const c = draftCache, R = c.runner, dsc = new Scope();
   // no preview yet (the tool is open but not filled in): just have the model ready, so the first preview is quick
   if (!draft) {
-    return { base: haveKey !== key ? { bodies: c.base.bodies.map((b) => ({ ...b, mesh: cloneMesh(b.mesh) })), steps: c.base.steps } : null, baseKey: key, draft: { bodies: [], step: { id: '' } }, removed: [], added: [] };
+    return { base: haveKey !== key ? { bodies: c.base.bodies.map((b) => ({ ...b, mesh: cloneMesh(b.mesh) })), steps: c.base.steps, consumed: c.base.consumed } : null, baseKey: key, draft: { bodies: [], step: { id: '' } }, removed: [], added: [] };
   }
-  const saved = R.bodies.map((b) => ({ b, shape: b.shape, tags: b.tags, keeps: b.keeps })), nBodies = R.bodies.length, nRes = R.results.length;
+  const saved = R.bodies.map((b) => ({ b, shape: b.shape, tags: b.tags, keeps: b.keeps })), nBodies = R.bodies.length, nRes = R.results.length, consumedBefore = new Set(R.consumed);
+  let gone = new Set<string>();
   const baseShapes = R.bodies.filter((b) => b.shape).map((b) => ({ id: b.id, shape: b.shape! }));
   try {
     let bodies: { id: string; shape: Shape3D | null }[], step: StepResult;
@@ -634,11 +741,11 @@ export function buildDraft(steps: BuildStep[], draft: BuildStep | null, haveKey:
       // a pattern can move the original feature, so it runs on a fresh build of everything
       const full = makeRunner(steps.concat([draft]), dsc);
       full.run(steps.concat([draft]));
-      bodies = full.bodies; step = full.results[full.results.length - 1];
+      bodies = full.bodies; step = full.results[full.results.length - 1]; gone = full.consumed;
     } else {
       R.setScope(dsc);
       R.run([draft]);
-      bodies = R.bodies; step = R.results[R.results.length - 1];
+      bodies = R.bodies; step = R.results[R.results.length - 1]; gone = new Set(R.consumed);
     }
     const out = bodies.filter((b) => b.shape);
     const removed: BodyMesh[] = [], added: BodyMesh[] = [];
@@ -650,7 +757,7 @@ export function buildDraft(steps: BuildStep[], draft: BuildStep | null, haveKey:
       const baseVol = new Map(c.base.bodies.map((b) => [b.id, b.volume]));
       baseShapes.forEach((a) => {
         const b = out.find((x) => x.id === a.id);
-        if (!b) { removed.push(meshBody(a.shape)); return; }
+        if (!b) { if (!gone.has(a.id)) removed.push(meshBody(a.shape)); return; } // a body a Combine used up is not "removed" matter
         const dv = volumes.find((v) => v.id === a.id)!.volume - (baseVol.get(a.id) || 0), eps = 1e-6;
         // a tool that only takes material away (or only adds) needs just one of the two differences
         if (dv < -eps || Math.abs(dv) <= eps) diff(a.shape, b.shape!, removed);
@@ -659,12 +766,13 @@ export function buildDraft(steps: BuildStep[], draft: BuildStep | null, haveKey:
       out.forEach((b) => { if (!baseShapes.some((a) => a.id === b.id)) added.push(meshBody(b.shape!)); });
     }
     const sendBase = haveKey !== key;
-    return { base: sendBase ? { bodies: c.base.bodies.map((b) => ({ ...b, mesh: cloneMesh(b.mesh) })), steps: c.base.steps } : null, baseKey: key, draft: { bodies: volumes, step }, removed, added };
+    return { base: sendBase ? { bodies: c.base.bodies.map((b) => ({ ...b, mesh: cloneMesh(b.mesh) })), steps: c.base.steps, consumed: c.base.consumed } : null, baseKey: key, draft: { bodies: volumes, step }, removed, added };
   } finally {
     saved.forEach((s) => { s.b.shape = s.shape; s.b.tags = s.tags; s.b.keeps = s.keeps; });
     R.bodies.length = nBodies;
     R.results.length = nRes;
     R.forget(draft.id);
+    R.consumed.clear(); consumedBefore.forEach((x) => R.consumed.add(x));
     R.setScope(c.sc);
     dsc.end();
   }

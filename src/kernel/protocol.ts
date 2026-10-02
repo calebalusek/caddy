@@ -73,6 +73,57 @@ export type BuildStep =
       direction: 'Inside' | 'Outside';
     }
   | {
+      kind: 'combine';
+      id: string;
+      /** The body that is kept, and the bodies used on it. */
+      target: string | null;
+      tools: string[];
+      operation: 'Join' | 'Cut' | 'Intersect';
+      /** Keep the tool bodies after combining (Cut and Intersect often want this). */
+      keepTools: boolean;
+    }
+  | {
+      kind: 'transform';
+      id: string;
+      bodies: string[];
+      /** 'free': scale, then turn, then move. 'lay': turn so the picked face is the bottom, and sit on the build plate. */
+      mode: 'free' | 'lay';
+      move: Vec3;
+      /** Turn about this axis (a direction) through the pivot. */
+      rotAxis: Vec3;
+      rotDeg: number;
+      /** 1 = unchanged. */
+      scale: number;
+      pivot: 'body' | 'origin';
+      /** Leave the originals and make copies. */
+      copy: boolean;
+      lay: FaceSpec | null;
+      bodyIds: string[];
+    }
+  | {
+      kind: 'split';
+      id: string;
+      body: string | null;
+      plane: { o: Vec3; n: Vec3 } | null;
+      keys: 'None' | 'Pins' | 'Rib' | 'Dovetail';
+      keySize: number;
+      keyCount: number;
+      keyDepth: number;
+      clearance: number;
+      /** The new body (the side the plane's normal points away from). */
+      bodyIds: string[];
+    }
+  | {
+      kind: 'offsetbody';
+      id: string;
+      bodies: string[];
+      /** Positive grows the body, negative shrinks it. */
+      distance: number;
+      sharp: boolean;
+      copy: boolean;
+      bodyIds: string[];
+    }
+  | {
       kind: 'thread';
       id: string;
       /** The cylindrical face (a shaft or a hole) and where it was clicked: the thread starts at the end nearest that spot. */
@@ -189,7 +240,8 @@ export interface BodyResult {
 }
 
 export interface StepResult { id: string; error?: boolean; note?: string; box?: [Vec3, Vec3]; /** Something worth telling the user about a step that worked (a thread's size). */ info?: string }
-export interface BuildResult { bodies: BodyResult[]; steps: StepResult[] }
+/** consumed: bodies a Combine used up (they are gone from the model, and from the Browser). */
+export interface BuildResult { bodies: BodyResult[]; steps: StepResult[]; consumed: string[] }
 
 /** A tool's live preview: the model as it is, the model with the tool applied, and what the tool takes away and adds. */
 export interface PreviewBody { id: string; volume: number; box: [Vec3, Vec3] }

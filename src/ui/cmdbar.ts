@@ -103,6 +103,7 @@ type Group = [label: string, color: string, ids: string[]];
 const SOLID_GROUPS: Group[] = [
   ['Create', 'create', ['sketch', 'extrude', 'revolve', 'sweep', 'hole', 'text', 'thread']],
   ['Modify', 'modify', ['fillet', 'chamfer', 'shell', 'patrect', 'mirror']],
+  ['Bodies', 'modify', ['transform', 'combine', 'split', 'offsetbody']],
   ['Construct', 'construct', ['plane']],
   ['Look', 'print', ['appearance', 'renderview']],
   ['Print', 'print', ['overhang', 'stl', '3mf', 'step']],
@@ -112,7 +113,7 @@ const SKETCH_GROUPS: Group[] = [
   ['Modify', 'modify', ['move', 'soffset', 'trim']],
   ['Constraints', 'construct', ['dimension', 'coincident', 'midpt', 'tangent', 'hv', 'perp', 'par', 'equal', 'fix']],
 ];
-const SHORT: Record<string, string> = { stext: 'Text', renderview: 'Render', appearance: 'Materials', midpt: 'Midpoint', sketch: 'Sketch', patrect: 'Pattern', overhang: 'Overhangs', stl: 'STL', '3mf': '3MF', step: 'STEP', soffset: 'Offset', plane: 'Offset plane', hv: 'Horiz/Vert', perp: 'Perpendicular' };
+const SHORT: Record<string, string> = { stext: 'Text', renderview: 'Render', appearance: 'Materials', midpt: 'Midpoint', sketch: 'Sketch', patrect: 'Pattern', transform: 'Move/Turn', offsetbody: 'Offset body', split: 'Split', overhang: 'Overhangs', stl: 'STL', '3mf': '3MF', step: 'STEP', soffset: 'Offset', plane: 'Offset plane', hv: 'Horiz/Vert', perp: 'Perpendicular' };
 
 export function renderToolbar(): void {
   const sk = state.mode === 'sketch';

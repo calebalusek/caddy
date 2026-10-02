@@ -49,7 +49,7 @@ export function unifyKeeping(shape: Shape3D, keeps: Disk[], sc: Scope): Shape3D 
 }
 
 /** A block covering the side of the plane through C that m points to, S wide and deep. */
-function slab(C: Vec3, m: Vec3, S: number, sc: Scope): Shape3D {
+export function slab(C: Vec3, m: Vec3, S: number, sc: Scope): Shape3D {
   const u = vnorm(Math.abs(m[0]) < 0.9 ? vcross(m, [1, 0, 0]) : vcross(m, [0, 1, 0])), v = vcross(m, u);
   const sq = sc.add(makePolygon(([[S, S], [-S, S], [-S, -S], [S, -S]] as P2[]).map(([a, b]) => vadd(C, vadd(vsc(u, a), vsc(v, b))))));
   return sc.add(basicFaceExtrusion(sq, sc.add(new Vector(vsc(m, S)))));

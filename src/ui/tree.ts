@@ -4,6 +4,7 @@ import { fmtU } from '../core/units';
 import { icon } from '../core/icons';
 import { emit, on } from '../app/hub';
 import { deleteBody, deleteFeature, markDirty, toggleVis } from '../app/history';
+import { consumedBodies } from '../app/solids';
 import { bodyById, featById, feats, state } from '../app/state';
 import type { Feature, OriginPlaneId, PlaneRef } from '../model/types';
 import { enterSketch, finishSketch, lookAtSketch, selectSketch } from '../sketch/session';
@@ -51,7 +52,7 @@ function ctxItems(ref: string): MenuItem[] {
   else if (kind === 'extrude') { const cut = (f.params as any).operation === 'Cut'; items.push({ label: 'Edit ' + (cut ? 'cut' : 'extrude'), icon: cut ? 'cut' : 'extrude', act: () => editRef(ref) }); }
   items.push({ label: 'Rename', icon: 'rename', act: () => startRename(ref) });
   if (kind === 'fillet') { const k = String((f.params as any).kind || 'fillet'); items.push({ label: 'Edit ' + k, icon: k, act: () => editRef(ref) }); }
-  if (['revolve', 'hole', 'sweep', 'shell', 'pattern', 'mirror', 'text', 'thread'].includes(kind)) items.push({ label: 'Edit ' + kind, icon: kind, act: () => editRef(ref) });
+  if (['revolve', 'hole', 'sweep', 'shell', 'pattern', 'mirror', 'text', 'thread', 'combine', 'transform', 'split', 'offsetbody'].includes(kind)) items.push({ label: 'Edit ' + kind, icon: kind, act: () => editRef(ref) });
   if (kind === 'sketch' || kind === 'plane') items.push({ label: f.visible === false ? 'Show' : 'Hide', icon: f.visible === false ? 'eye' : 'eyeoff', act: () => toggleVis(ref) });
   items.push({ sep: true }, { label: 'Delete', icon: 'trash', danger: true, act: () => deleteFeature(f) });
   return items;
@@ -96,7 +97,7 @@ const originPlaneRow = (id: OriginPlaneId): string =>
 const openSections: Record<string, boolean> = { origin: false, sketches: true, construction: true, bodies: true };
 
 export function renderTree(): void {
-  const sks = feats('sketch'), pls = feats('plane'), bs = state.bodies;
+  const sks = feats('sketch'), pls = feats('plane'), gone = consumedBodies(), bs = state.bodies.filter((b) => !gone.includes(b.id));
   const sec = (key: string, title: string, count: number, inner: string): string =>
     `<details data-sec="${key}"${openSections[key] ? ' open' : ''}><summary><span class="nm">${title}</span><span class="count">${count}</span></summary>${inner}</details>`;
   $('#tree').innerHTML =
@@ -115,6 +116,10 @@ function tip(f: Feature): string {
     case 'sketch': return f.name;
     case 'shell': return `${f.name}: ${fmtU(p.thickness)} walls`;
     case 'pattern': return `${f.name}: ${String(p.ptype).toLowerCase()} pattern`;
+    case 'combine': return `${f.name}: ${String(p.operation).toLowerCase()} ${(p.tools || []).length} bod${(p.tools || []).length === 1 ? 'y' : 'ies'}`;
+    case 'transform': return `${f.name}: ${p.mode === 'Lay a face down' ? 'laid on a face' : p.copy === 'Copy' ? 'moved copy' : 'moved / turned / scaled'}`;
+    case 'split': return `${f.name}: split${p.keys && p.keys !== 'None' ? ' with ' + String(p.keys).toLowerCase() : ''}`;
+    case 'offsetbody': return `${f.name}: ${p.distance >= 0 ? 'grown' : 'shrunk'} ${fmtU(Math.abs(p.distance))}`;
     case 'mirror': return `${f.name}: ${(p.bodies || []).length} bod${(p.bodies || []).length === 1 ? 'y' : 'ies'} mirrored`;
     case 'text': return `${f.name}: "${String(p.text).slice(0, 24)}"`;
     case 'thread': return `${f.name}: ${p.kind === 'Internal' ? 'internal' : 'external'} thread, ${fmtU(p.pitch)} pitch`;
