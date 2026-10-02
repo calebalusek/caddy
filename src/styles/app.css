@@ -1,8 +1,8 @@
 /* CADDY app styles, carried over from the prototype (reference/caddy-prototype.html) so the look matches exactly. */
 :root{
   box-sizing:border-box;
-  padding-top:env(safe-area-inset-top,0px);
-  padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-top:min(env(safe-area-inset-top,0px),24px);
+  padding-bottom:min(env(safe-area-inset-bottom,0px),12px); /* room for the status bar and home bar, never the huge margins some iPad windows report */
   --chrome:#E9ECEF; --panel:#F6F7F8; --panel-2:#E0E4E8; --field:#FFFFFF; --line:#C9CFD5;
   --text:#1C2126; --text-2:#525C66; --accent:#A95F07; --accent-fill:#F0A23B; --on-accent:#1B1609;
   --select:#2B66D1; --focus:#2B66D1; --warn:#B4400B;
@@ -127,7 +127,7 @@ body.dropping .viewport::after{content:"Drop a CADDY file to open it";position:a
 .finish small{font-family:"Barlow Condensed",system-ui,sans-serif;color:var(--text-2);font-weight:500;letter-spacing:.04em}
 
 /* browser */
-.workspace{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:0}
+.workspace{display:grid;grid-template-columns:var(--bw,220px) minmax(0,1fr);min-height:0;position:relative}
 .browser{background:var(--panel);border-right:1px solid var(--line);overflow:auto;padding:8px 6px}
 .browser h2{font-size:12.5px;font-weight:600;color:var(--text-2);margin:2px 8px 6px}
 .browser details{margin-bottom:3px}
@@ -418,7 +418,7 @@ button.selchip{width:100%;text-align:left;cursor:pointer;font:inherit}
 :root[data-device="tablet"] .devnote{display:none}
 body.no-browser .workspace{grid-template-columns:minmax(0,1fr)}
 body.no-browser .browser{display:none}
-:root[data-device="tablet"] body{padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+:root[data-device="tablet"] body{padding:0 min(env(safe-area-inset-right,0px),12px) 0 min(env(safe-area-inset-left,0px),12px);-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
 :root[data-device="tablet"] :not(input):not(textarea){-webkit-user-select:none;user-select:none}
 :root[data-device="tablet"] input,:root[data-device="tablet"] textarea{font-size:16px}
 :root[data-device="tablet"] .tbtn{min-width:70px;min-height:58px;padding:8px 8px 5px}
@@ -467,3 +467,41 @@ body.no-browser .browser{display:none}
 :root[data-device="tablet"] #cmdInput,:root[data-device="tablet"] .sugs{display:none!important}
 :root[data-device="tablet"] .tguide{display:block;flex:1;min-width:0;color:var(--text-2);font-size:15px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 :root[data-device="tablet"] .cmd{padding-top:2px;padding-bottom:6px}
+
+/* the Browser's draggable edge; iPad mini: tighter spacing so the model gets the room */
+.bsplit{position:absolute;top:0;bottom:0;left:calc(var(--bw,220px) - 7px);width:14px;z-index:5;cursor:col-resize;touch-action:none}
+.bsplit::after{content:"";position:absolute;top:50%;left:5px;width:4px;height:42px;margin-top:-21px;border-radius:2px;background:var(--line);opacity:.0;transition:opacity .15s}
+.bsplit:hover::after,.bsplit.on::after{opacity:1;background:var(--accent-fill)}
+:root[data-device="tablet"] .bsplit::after{opacity:.9}
+body.no-browser .bsplit{display:none}
+@media (max-width:760px){.bsplit{display:none}}
+:root[data-device="tablet"] .talias{display:none}
+:root[data-device="tablet"] .tgroups{scrollbar-width:none;-webkit-overflow-scrolling:touch}
+:root[data-device="tablet"] .tgroups::-webkit-scrollbar{display:none}
+:root[data-device="tablet"] .tbtn{min-width:62px;padding:6px 4px 4px}
+:root[data-device="tablet"] .tgroup{padding:0 3px}
+:root[data-device="tablet"] .topbar{padding:4px 10px;gap:8px}
+@media (max-height:820px){
+  :root[data-device="tablet"] .tgroup-label{display:none}
+  :root[data-device="tablet"] .tbtn{min-height:50px}
+  :root[data-device="tablet"] .tbtn svg.i{width:25px;height:25px}
+  :root[data-device="tablet"] .tl-item{width:44px;height:36px}
+  :root[data-device="tablet"] .tabs{padding-top:2px}
+  :root[data-device="tablet"] .rowbtn{min-height:36px;padding:5px 6px;font-size:14px}
+  :root[data-device="tablet"] .browser summary{padding:8px 6px;font-size:14px}
+  :root[data-device="tablet"] .tl-hint{display:none}
+}
+:root[data-device="tablet"] .browser{padding:6px 4px}
+/* the number pad's own Hide button; the Undo / Esc / Enter bar steps aside while it is out */
+.keypad .kphead{grid-column:1 / -1;display:flex;align-items:center;justify-content:space-between;color:var(--text-2);font-size:13px;padding:0 2px 2px}
+.keypad .kphide{min-height:36px;padding:0 14px;border:1px solid var(--line);background:var(--panel-2);color:var(--text);border-radius:8px;font:600 14px/1 "Barlow",system-ui,sans-serif}
+body.keypad-open .touchbar{display:none!important}
+@media (max-height:820px){ .keypad{grid-template-columns:repeat(5,52px);gap:5px;padding:8px} .keypad .kp{height:44px;font-size:18px} }
+/* iPad: a narrow window (an iPad mini upright is 744 px wide) still gets the Browser, just a slimmer one */
+:root[data-device="tablet"]{--bw:176px}
+@media (max-width:760px){
+  :root[data-device="tablet"] body:not(.no-browser) .workspace{grid-template-columns:var(--bw,176px) minmax(0,1fr)}
+  :root[data-device="tablet"] body:not(.no-browser) .browser{display:block}
+  :root[data-device="tablet"] body:not(.no-browser) .bsplit{display:block}
+  :root[data-device="tablet"] .tname{display:block}
+}

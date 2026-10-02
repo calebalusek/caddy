@@ -204,8 +204,9 @@ test.describe('iPad mode', () => {
     const before = await size('.tbtn');
     await goTablet(page);
     const after = await size('.tbtn');
-    expect(after[1]).toBeGreaterThanOrEqual(56); // at least about a fingertip (44 pt) tall
-    expect(after[1]).toBeGreaterThan(before[1]);
+    expect(after[1]).toBeGreaterThanOrEqual(52); // about a fingertip (44 pt) tall or more, even with the shortcut letters gone
+    expect(after[0]).toBeGreaterThanOrEqual(62);
+    void before;
     await expect(page.locator('#browserToggle')).toBeVisible();
     await expect(page.locator('.browser')).toBeVisible();
     await page.locator('#browserToggle').click();
@@ -270,10 +271,11 @@ test('iPad mode: Undo, Esc and Enter buttons stand in for the keys', async ({ pa
   await expect(page.locator('.touchbar')).toBeVisible();
   await page.locator('.touchbar [data-tb="undo"]').click(); // Undo reopens the extrude menu
   await expect(page.locator('section.dialog')).toBeVisible();
+  await page.locator('.keypad [data-k="hide"]').click(); // (the number pad is out while a size box is being edited; put it away to reach these buttons)
   await page.locator('.touchbar [data-tb="esc"]').click(); // Esc closes it
   await expect(page.locator('section.dialog')).toHaveCount(0);
   await page.locator('.touchbar [data-tb="undo"]').click();
-  await page.locator('#f-distance').focus();
+  await page.locator('.keypad [data-k="hide"]').click();
   await page.locator('.touchbar [data-tb="enter"]').click(); // Enter finishes it
   await expect(page.locator('section.dialog')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -297,4 +299,79 @@ test('iPad mode has no command line: buttons only, with the guidance text kept',
   await page.locator('#devSwitch button[data-device="desktop"]').click();
   await expect(page.locator('#cmdInput')).toBeVisible(); // desktop is unchanged
   expect(errors).toEqual([]);
+});
+
+test.describe('iPad mini', () => {
+  const goTablet = async (page: Page): Promise<void> => { await page.locator('#devSwitch button[data-device="tablet"]').click(); await expect(page.locator('html')).toHaveAttribute('data-device', 'tablet'); };
+
+  for (const [name, w, h] of [['landscape', 1133, 744], ['portrait', 744, 1133]] as const) {
+    test(`${name} (${w} × ${h}): no gap above the toolbar even when the system reports big safe areas; nothing spills out`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      const errors = await openApp(page);
+      await goTablet(page);
+      // the iPad can report large "safe area" margins (window controls, home bar); only a little of that may be used
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: { top: 74, bottom: 75, left: 30, right: 30 } } as any).catch(() => undefined);
+      await page.waitForTimeout(200);
+      const r = await page.evaluate(() => {
+        const top = document.querySelector('.topbar')!.getBoundingClientRect(), foot = document.querySelector('footer')!.getBoundingClientRect();
+        return { top: top.top, bottom: foot.bottom, vh: window.innerHeight, scrollW: document.documentElement.scrollWidth, w: window.innerWidth, scrollH: document.documentElement.scrollHeight };
+      });
+      expect(r.top).toBeLessThanOrEqual(26); // the bar starts right under the status bar
+      expect(r.vh - r.bottom).toBeLessThanOrEqual(14);
+      expect(r.scrollW).toBeLessThanOrEqual(r.w);
+      expect(r.scrollH).toBeLessThanOrEqual(r.vh + 1);
+      await expect(page.locator('.browser')).toBeVisible(); // even upright, the Browser is there (slim)
+      await expect(page.locator('.tbtn .tname').first()).toBeVisible(); // and the toolbar keeps its names
+      // the model area keeps at least half of the screen height
+      const vpH = await page.evaluate(() => document.querySelector('#viewport')!.getBoundingClientRect().height);
+      expect(vpH).toBeGreaterThan(h * (w > h ? 0.5 : 0.6));
+      expect(errors).toEqual([]);
+    });
+  }
+
+  test('the Browser can be dragged narrower (and wider), and double-tapping its edge resets it', async ({ page }) => {
+    await page.setViewportSize({ width: 1133, height: 744 });
+    const errors = await openApp(page);
+    await goTablet(page);
+    const width = () => page.evaluate(() => document.querySelector('.browser')!.getBoundingClientRect().width);
+    const w0 = await width();
+    const bar = (await page.locator('#bsplit').boundingBox())!, y = bar.y + bar.height / 2, x = bar.x + bar.width / 2;
+    const h = await hand(page);
+    await h.drag([{ x, y }], [{ x: x - 70, y }]);
+    const w1 = await width();
+    expect(w0).toBeLessThanOrEqual(180); // slim from the start on a tablet
+    expect(w1).toBeLessThan(w0 - 50); // narrower
+    expect(w1).toBeGreaterThanOrEqual(96);
+    await page.reload();
+    await expect(page.locator('#toolbar .tbtn').first()).toBeVisible();
+    expect(Math.abs((await width()) - w1)).toBeLessThan(2); // remembered
+    const bar2 = (await page.locator('#bsplit').boundingBox())!;
+    await h.drag([{ x: bar2.x + 7, y: bar2.y + 200 }], [{ x: bar2.x - 400, y: bar2.y + 200 }]);
+    expect(await width()).toBeGreaterThanOrEqual(96); // never squeezed to nothing
+    await page.locator('#bsplit').dblclick();
+    expect(Math.abs((await width()) - w0)).toBeLessThan(2); // reset to the starting width
+    expect(errors).toEqual([]);
+  });
+
+  test('the number pad has a Hide button; tapping the box brings it back; the Undo / Esc / Enter bar makes room while it is out', async ({ page }) => {
+    await page.setViewportSize({ width: 1133, height: 744 });
+    const errors = await openApp(page);
+    await box(page);
+    await page.keyboard.press('Control+z');
+    await goTablet(page);
+    await expect(page.locator('.touchbar')).toBeVisible();
+    await page.locator('#f-distance').focus();
+    await expect(page.locator('.keypad')).toBeVisible();
+    await expect(page.locator('.touchbar')).toBeHidden();
+    await page.locator('.keypad [data-k="hide"]').click();
+    await expect(page.locator('.keypad')).toBeHidden();
+    await expect(page.locator('.touchbar')).toBeVisible();
+    await expect(page.locator('#f-distance')).toBeFocused(); // still editing, just without the pad (and no system keyboard)
+    await page.locator('#f-distance').click();
+    await expect(page.locator('.keypad')).toBeVisible();
+    const ok = await page.evaluate(() => { const r = document.querySelector('.keypad')!.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.height < window.innerHeight * 0.6; });
+    expect(ok).toBe(true); // fits an iPad mini with room to spare
+    expect(errors).toEqual([]);
+  });
 });

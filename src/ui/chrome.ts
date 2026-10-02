@@ -78,6 +78,29 @@ function initUnits(): void {
   apply(storage.get('caddy-units') === 'in' ? 'in' : 'mm', false);
 }
 
+/** Drag the Browser's edge to make it narrower or wider (remembered). Double-click or double-tap resets it. */
+function initBrowserWidth(): void {
+  const KEY = 'caddy-browser-w', MIN = 96, MAX = 380;
+  const set = (w: number | null): void => {
+    if (w === null) { root.style.removeProperty('--bw'); storage.set(KEY, ''); return; }
+    const c = Math.max(MIN, Math.min(MAX, Math.round(w)));
+    root.style.setProperty('--bw', c + 'px');
+    storage.set(KEY, String(c));
+  };
+  const saved = +(storage.get(KEY) || 0);
+  if (saved) set(saved);
+  const bar = $('#bsplit'), browser = document.querySelector<HTMLElement>('.browser')!;
+  let drag: { x: number; w: number } | null = null;
+  bar.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, w: browser.getBoundingClientRect().width }; bar.setPointerCapture(e.pointerId); bar.classList.add('on'); e.preventDefault(); });
+  bar.addEventListener('pointermove', (e) => { if (drag) set(drag.w + (e.clientX - drag.x)); });
+  const end = (): void => { drag = null; bar.classList.remove('on'); };
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', end);
+  bar.addEventListener('dblclick', () => set(null));
+  let lastTap = 0;
+  bar.addEventListener('pointerup', (e) => { if (e.pointerType !== 'touch') return; const now = performance.now(); if (now - lastTap < 350) set(null); lastTap = now; });
+}
+
 function initFileMenu(): void {
   $('#fileBtn').addEventListener('click', (e) => {
     const btn = e.currentTarget as HTMLElement, b = btn.getBoundingClientRect();
@@ -110,6 +133,7 @@ export function initChrome(): void {
   initTheme();
   initDevice();
   initUnits();
+  initBrowserWidth();
   initFileMenu();
   initViewMode();
   $('#startClose').innerHTML = icon('close');

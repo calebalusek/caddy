@@ -20,12 +20,14 @@ export function initKeypad(): void {
   pad.hidden = true;
   pad.setAttribute('role', 'group');
   pad.setAttribute('aria-label', 'Number pad');
-  pad.innerHTML = KEYS.map(([label, k, cls]) => `<button type="button" class="kp${cls ? ' ' + cls : ''}" data-k="${k}" aria-label="${label}">${label}</button>`).join('')
+  pad.innerHTML = '<div class="kphead"><span>Number pad</span><button type="button" class="kphide" data-k="hide" aria-label="Hide the number pad">Hide ▾</button></div>' + KEYS.map(([label, k, cls]) => `<button type="button" class="kp${cls ? ' ' + cls : ''}" data-k="${k}" aria-label="${label}">${label}</button>`).join('')
     + '<button type="button" class="kp wide" data-k="next">Next</button><button type="button" class="kp wide ok" data-k="done">Done</button>';
   vp.appendChild(pad);
 
   let target: HTMLInputElement | null = null;
   const tablet = (): boolean => state.device === 'tablet';
+  /** Show or put away the pad (the Undo / Esc / Enter bar gives up its place while the pad is out). */
+  const show = (on: boolean): void => { pad.hidden = !on; document.body.classList.toggle('keypad-open', on); };
 
   const send = (key: string): void => {
     if (!target) return;
@@ -33,6 +35,7 @@ export function initKeypad(): void {
     el.focus({ preventScroll: true });
     const s = el.selectionStart ?? el.value.length, e = el.selectionEnd ?? s;
     const changed = (): void => { el.dispatchEvent(new Event('input', { bubbles: true })); };
+    if (key === 'hide') { show(false); return; } // put away; tap the box again to bring it back
     if (key === 'back') {
       if (s !== e) el.setRangeText('', s, e, 'end');
       else if (s > 0) el.setRangeText('', s - 1, s, 'end');
@@ -67,16 +70,21 @@ export function initKeypad(): void {
     if (!tablet() || !t.matches || !t.matches(NUMERIC)) return;
     target = t as HTMLInputElement;
     target.inputMode = 'none'; // no system keyboard: the pad is the keyboard
-    pad.hidden = false;
+    show(true);
   });
   document.addEventListener('focusout', () => {
     setTimeout(() => {
       const a = document.activeElement as HTMLElement | null;
       if (a && a.matches && a.matches(NUMERIC) && tablet()) return;
       target = null;
-      pad.hidden = true;
+      show(false);
     }, 150);
   });
+  // tapping the box that is already being edited brings a hidden pad back
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target as HTMLElement;
+    if (tablet() && t.matches && t.matches(NUMERIC)) { target = t as HTMLInputElement; target.inputMode = 'none'; show(true); }
+  }, true);
   // leaving iPad mode puts the pad away
-  document.addEventListener('visibilitychange', () => { if (document.hidden) pad.hidden = true; });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) show(false); });
 }

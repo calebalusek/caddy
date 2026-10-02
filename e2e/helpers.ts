@@ -15,7 +15,7 @@ export async function openApp(page: Page, opts: { keepStorage?: boolean } = {}):
   await expect(page.locator('#toolbar .tbtn').first()).toBeVisible();
   // Tips cover part of the viewport; close them like a user would.
   const tips = page.locator('#startClose');
-  if (await tips.count()) await tips.click();
+  if (await tips.count() && await tips.isVisible()) await tips.click();
   return errors;
 }
 
