@@ -1,9 +1,10 @@
-﻿// Body tools: Move / Rotate / Scale (with Copy and Lay a face down), Combine, Split body, Offset body.
+// Body tools: Move / Rotate / Scale (with Copy and Lay a face down), Combine, Split body, Offset body.
 import { expect, test, type Page } from '@playwright/test';
 import { openApp, screenOf, settle, typeCommand } from './helpers';
 
 const at = (page: Page, x: number, y: number) => page.evaluate(([a, b]) => (window as any).__caddy.sketchScreen(a, b), [x, y]) as Promise<{ x: number; y: number }>;
-const built = (page: Page) => page.evaluate(async () => {
+type Built = { bodies: { id: string; volume: number; box: number[][] }[]; features: { id: string; type: string; name: string; error: boolean; note: string }[] };
+const built = (page: Page): Promise<Built> => page.evaluate(async () => {
   const c = (window as any).__caddy;
   await new Promise((r) => setTimeout(r, 450));
   await c.whenBuilt();
@@ -141,6 +142,25 @@ test.describe('body tools', () => {
     // two pins by default (the Pins count starts at 2)
     expect(vols[0]).toBeCloseTo(12000 - 2 * Math.PI * 3.2 * 3.2 * 8.2, 2);
     expect(vols[1]).toBeCloseTo(12000 + 2 * Math.PI * 9 * 8, 2);
+    expect(errors).toEqual([]);
+  });
+
+  test('Hole presets fill the menu: M3 heat-set insert pocket, then a counterbored M4 screw', async ({ page }) => {
+    const errors = await openApp(page);
+    await box(page, 40, 30, 20);
+    await typeCommand(page, 'ho');
+    await expect(dialog(page)).toBeVisible();
+    await expect(page.locator('#f-d')).toHaveValue('0'); // Custom: values start at 0
+    await page.locator('input[name="f-preset"][value="Heat-set insert"]').check({ force: true });
+    await expect(page.locator('#f-d')).toHaveValue('4.2');
+    await expect(page.locator('#f-depth')).toHaveValue('6');
+    await expect(page.locator('input[name="f-extent"][value="Distance"]')).toBeChecked();
+    await page.locator('input[name="f-preset"][value="Counterbored screw"]').check({ force: true });
+    await page.locator('input[name="f-size"][value="4"]').check({ force: true });
+    await expect(page.locator('#f-d')).toHaveValue('4.5');
+    await expect(page.locator('#f-cbD')).toHaveValue('7.5');
+    await expect(page.locator('input[name="f-type"][value="Counterbore"]')).toBeChecked();
+    await expect(page.locator('input[name="f-extent"][value="Through all"]')).toBeChecked();
     expect(errors).toEqual([]);
   });
 

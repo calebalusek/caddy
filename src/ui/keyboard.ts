@@ -54,7 +54,7 @@ export function initKeyboard(): void {
         if (/^[0-9.\-+*/()]$/.test(e.key)) { e.preventDefault(); typeIntoHud(e.key); return; }
         if (e.key === 'Enter') { e.preventDefault(); hudEnter(); return; }
       }
-      if (T && (T.type === 'offset' || T.type === 'move') && T.phase === 'select' && (e.key === 'Enter' || e.key === ' ') && !onButton) { e.preventDefault(); advanceSelect(); return; }
+      if (T && (T.type === 'offset' || T.type === 'move' || T.type === 'smirror') && T.phase === 'select' && (e.key === 'Enter' || e.key === ' ') && !onButton) { e.preventDefault(); advanceSelect(); return; }
       if (T && (e.key === ' ' || e.key === 'Enter') && !onButton) { e.preventDefault(); return; }
     } else if (e.key === 'Escape') {
       const had = state.selection.length > 0 || !!state.treeSel || !!state.selected;

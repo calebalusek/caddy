@@ -1,4 +1,4 @@
-﻿// Rebuilding the bodies from the timeline. The kernel runs in a Web Worker, so this is asynchronous:
+// Rebuilding the bodies from the timeline. The kernel runs in a Web Worker, so this is asynchronous:
 // the UI stays responsive and the bodies update when the result arrives.
 import { Kernel } from '../kernel/client';
 import type { BodyResult, BuildResult, BuildStep, DraftResult, PreviewBody } from '../kernel/protocol';

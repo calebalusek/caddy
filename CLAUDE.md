@@ -66,6 +66,19 @@ parts for **3D printing**. Built for the owner and other people to use.
     Threads take ~3 s to build (they are rebuilt with every timeline change).
     **All planned tools are rebuilt.** Next: whatever the owner asks for; open items are the license choice
     and the real Windows Save As check.
+  - **Advanced tools, batch 1 done** (2026-10-02, not yet published): a "Bodies" toolbar group with Combine
+    (`tools/combine.ts`: Join/Cut/Intersect, keep tools; used bodies are `consumed` and leave the Browser),
+    Move/Rotate/Scale (`tools/transform.ts`: Copy, Lay a face down onto the build plate), Split body
+    (`tools/split.ts`, `kernel/bodyops.ts`: plane split, optional Pins/Rib/Dovetail keys with clearance) and
+    Offset body (`tools/offsetbody.ts`: grow/shrink, sharp or round corners). Shared body picking in
+    `tools/bodypick.ts`. Hole presets (`model/holepresets.ts`: M-screw clearance / counterbore / countersink,
+    heat-set insert pockets, magnet pockets; fills the menu through the new `onChange` hook in `ToolDef`).
+    Sketch tools in `sketch/extras.ts`: Slot, corner Fillet/Chamfer, Mirror, Project body edges (flat edges
+    and circles/arcs facing the sketch plane). Ellipse/Spline are deferred (they need new curve types).
+    Later ideas: Loft, Draft angle, wall-thickness check, Measure + weight, Section view, Coil, fit-to-bed
+    layout, snap-fit/hinge generators, lattice infill.
+  - Windows PowerShell 5.1 gotcha: `Get-Content`/`Set-Content` mangle UTF-8 (° × → Ø) and add a BOM. Edit
+    source files with the Edit tool or node, never with PowerShell read/write.
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
 
 ## How the rebuild is organised

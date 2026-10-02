@@ -9,6 +9,7 @@ import { feats, state } from '../app/state';
 import { cssv } from '../core/dom';
 import type { BuildStep } from '../kernel/protocol';
 import { vadd, vcross, vdot, vnorm, vsc, vsub } from '../model/frames';
+import { holePreset, PRESET_KINDS, PRESET_SIZES, type PresetKind } from '../model/holepresets';
 import { holeSpot, type HoleRef } from '../model/steps';
 import type { OtherFeature, Vec3 } from '../model/types';
 import { usedPoints } from '../sketch/model';
@@ -30,6 +31,8 @@ interface HoleParams {
   cbD: number;
   cbDepth: number;
   csD: number;
+  preset?: PresetKind;
+  size?: string;
 }
 type Dlg = ActiveDialog<HoleParams> & { hoverHole?: number; anchor?: { bodyId: string; n: Vec3; p: Vec3 } | null };
 
@@ -161,6 +164,8 @@ registerTool<HoleParams>({
   prompt: 'Click flat faces or sketch points to place holes',
   fields: [
     { key: 'pts', kind: 'chip', label: 'Placement', chipId: 'holeChip', note: 'Click again on a hole to remove it, or drag it along its face. Snaps to sketch points, corners, edge middles, the face middle and circle centers. Shift-click two points to put the hole halfway between them.' },
+    { key: 'preset', kind: 'choice', label: 'Preset', options: [...PRESET_KINDS], hintId: 'holePreset' },
+    { key: 'size', kind: 'choice', label: 'Size (M screw, or magnet diameter in mm)', options: [...PRESET_SIZES], showIf: (P) => !!P.preset && P.preset !== 'Custom' },
     { key: 'd', kind: 'length', label: 'Diameter', primary: true },
     { key: 'extent', kind: 'choice', label: 'Extent', options: ['Through all', 'Distance'] },
     { key: 'depth', kind: 'length', label: 'Depth', showIf: (P) => P.extent === 'Distance' },
@@ -169,7 +174,15 @@ registerTool<HoleParams>({
     { key: 'cbDepth', kind: 'length', label: 'Counterbore depth', showIf: (P) => P.type === 'Counterbore' },
     { key: 'csD', kind: 'length', label: 'Countersink diameter (90°)', showIf: (P) => P.type === 'Countersink' },
   ],
-  defaults: () => ({ pts: [], d: 0, extent: 'Through all', depth: 0, type: 'Simple', cbD: 0, cbDepth: 0, csD: 0 }),
+  defaults: () => ({ pts: [], d: 0, extent: 'Through all', depth: 0, type: 'Simple', cbD: 0, cbDepth: 0, csD: 0, preset: 'Custom', size: '3' }),
+  onChange: (A: Dlg, key: string) => {
+    if (key !== 'preset' && key !== 'size') return;
+    const f = holePreset(A.params.preset, A.params.size);
+    if (!f) { setHint('holePreset', ''); return; }
+    const { text, ...v } = f;
+    Object.assign(A.params, v);
+    setHint('holePreset', text + '. Change any number to adjust it.');
+  },
   chips: (A) => { const n = A.params.pts.length; return { holeChip: { set: n > 0, text: n ? `${n} hole${n > 1 ? 's' : ''} placed` : 'Click a flat face or sketch point' } }; },
   draftStep: step,
   preview: (A: Dlg) => { drawMarkers(A); return { cut: true, ok: A.params.pts.length > 0 && A.params.d > 0 }; },

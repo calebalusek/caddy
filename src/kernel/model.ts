@@ -1,4 +1,4 @@
-﻿// Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
+// Builds every body from the timeline with the real kernel (exact B-rep: true planes, cylinders, arcs).
 // Runs wherever the kernel is loaded: the Web Worker in the app, Node in tests.
 import {
   genericSweep, makeHelix, getFont, Plane, sketchText, makeOffset, assembleWire, basicFaceExtrusion, exportSTEP, makeCircle, makeFace, makeLine, makePolygon, makeThreePointArc, makeVertex, revolution, measureArea, measureDistanceBetween, measureVolume, Vector,
@@ -22,7 +22,7 @@ export const DISPLAY_QUALITY = { tolerance: 0.02, angularTolerance: 0.2 };
 
 const r4 = (v: number): number => Math.round(v * 1e4) / 1e4 + 0; // + 0 turns -0 into 0
 
-// ---- profiles â†’ kernel faces ----
+// ---- profiles → kernel faces ----
 function loopWire(frame: Frame, loop: LoopSpec, z: number, reversed: boolean, sc: Scope): Wire {
   const W = (p: P2): Vec3 => toWorld(frame, p[0], p[1], z);
   if ('circle' in loop) return assembleWire([sc.add(makeCircle(loop.circle.r, W(loop.circle.c), reversed ? vsc(frame.n, -1) : frame.n))]);
@@ -283,7 +283,7 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
         if (!st.profile) { res.error = true; res.note = 'its profile is gone'; continue; }
         if (!st.axis) { res.error = true; res.note = 'pick an axis to revolve around'; continue; }
         const ang = Math.min(360, Math.abs(st.angle));
-        if (ang < 0.01) { res.error = true; res.note = 'the angle needs to be more than 0Â°'; continue; }
+        if (ang < 0.01) { res.error = true; res.note = 'the angle needs to be more than 0°'; continue; }
         const fr = st.profile.frame, A = st.axis.A, d = vnorm(st.axis.d);
         if (Math.abs(vdot(d, fr.n)) > 1e-5 || Math.abs(vdot(fr.n, vsub(A, fr.o))) > 1e-3) { res.error = true; res.note = "the axis has to lie in the sketch's plane"; continue; }
         // the whole profile must sit on one side of the axis (touching it is fine)
@@ -660,7 +660,7 @@ function makeRunner(steps: BuildStep[], sc: Scope) {
           const b = bodies.find((x) => x.id === bid);
           if (!b || !b.shape) { bad += ks.length; return; }
           const { infos } = edgeInfos(b.shape, sc);
-          const picked = new Map<number, number>(); // edge id â†’ index in the feature's edge list
+          const picked = new Map<number, number>(); // edge id → index in the feature's edge list
           ks.forEach((k) => { const e = matchEdge(infos, st.edges[k]); if (e) picked.set(e.id, k); else bad++; });
           if (!picked.size) return;
           const sizeOf = (e: Edge): number | null => (picked.has(e.hashCode) ? st.r : null);

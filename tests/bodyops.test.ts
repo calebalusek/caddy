@@ -1,4 +1,4 @@
-﻿// Acceptance tests for Combine, Move/Rotate/Scale, Lay flat, Split (with keys) and Offset body, against exact numbers.
+// Acceptance tests for Combine, Move/Rotate/Scale, Lay flat, Split (with keys) and Offset body, against exact numbers.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildModel } from '../src/kernel/model';
 import type { BuildStep, ProfileSpec } from '../src/kernel/protocol';

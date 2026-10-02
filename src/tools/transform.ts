@@ -1,4 +1,4 @@
-﻿// Move / Rotate / Scale (MV): put bodies where you want them. "Lay a face down" turns a body so the flat
+// Move / Rotate / Scale (MV): put bodies where you want them. "Lay a face down" turns a body so the flat
 // face you click is on the build plate (the usual print orientation). Copy leaves the original in place.
 import { vdot } from '../model/frames';
 import { markDirty } from '../app/regenerate';
@@ -60,7 +60,7 @@ registerTool<XParams>({
     { key: 'y', kind: 'length', label: 'Move Y', showIf: (P) => !lay(P) },
     { key: 'z', kind: 'length', label: 'Move Z', primary: true, showIf: (P) => !lay(P) },
     { key: 'rotAxis', kind: 'choice', label: 'Turn about', options: ['X', 'Y', 'Z'], showIf: (P) => !lay(P) },
-    { key: 'angle', kind: 'length', label: 'Turn', unit: 'Â°', showIf: (P) => !lay(P) },
+    { key: 'angle', kind: 'length', label: 'Turn', unit: '°', showIf: (P) => !lay(P) },
     { key: 'scale', kind: 'length', label: 'Scale', unit: '%', showIf: (P) => !lay(P) },
     { key: 'pivot', kind: 'choice', label: 'Turn and scale around', options: ['Body middle', 'Origin'], showIf: (P) => !lay(P) },
     { key: 'copy', kind: 'choice', label: 'Result', options: ['Move', 'Copy'], showIf: (P) => !lay(P), hintId: 'xfHint' },

@@ -1,4 +1,4 @@
-﻿// Shared by the tools that work on whole bodies (Combine, Move/Rotate/Scale, Split, Offset body):
+// Shared by the tools that work on whole bodies (Combine, Move/Rotate/Scale, Split, Offset body):
 // clicking a body in the view or the Browser picks it, clicking it again lets it go, picked bodies show bold blue.
 import { emit } from '../app/hub';
 import { baseBodies, whenBuilt } from '../app/solids';

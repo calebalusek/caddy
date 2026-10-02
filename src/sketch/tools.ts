@@ -24,6 +24,8 @@ import {
 } from './model';
 import { independent, lineInter, lineUnit, solveSketch } from './solver';
 import { closeDimEdit, DofSentence, isDimEditing, pushHist, rebuildOverlay, setOverlaySel, skChanged, startDimEdit } from './session';
+import { baseBodies } from '../app/solids';
+import { addProjected, addSlot, cornerEdit, mirrorCurves, nearestProjected, projectables, projectedPts, slotOutline, type Projected } from './extras';
 import { planeHit, refreshSketchStyles, skScale, toolMat, toScreen, trimMat, tw, worldPerPixel } from './visuals';
 
 type Round = ArcCurve | CircleCurve;
@@ -31,15 +33,17 @@ type Round = ArcCurve | CircleCurve;
 interface Snap { p: P2; id: string | null; snapped: boolean; kind?: SnapKind; cv?: string; cv2?: string; invalid?: boolean; aligns?: { axis: 'x' | 'y'; ref: any }[]; from?: P2[]; d?: number }
 
 const hud = $('#hud'), snapEl = $('#snap'), pickTip = $('#pickTip');
-const DRAW_TOOLS = new Set(['line', 'rect', 'circle', 'polygon', 'arc']);
+const DRAW_TOOLS = new Set(['line', 'rect', 'circle', 'polygon', 'arc', 'slot']);
 type HudField = { k: string; label: string; name: string; unit?: string };
 const SIDES_FIELDS: HudField[] = [{ k: 'n', label: 'Sides', name: 'Number of sides', unit: '' }];
 const TOOL_FIELDS: Record<string, HudField[]> = {
   arc: [{ k: 'r', label: 'R', name: 'Arc radius' }], polygon: [{ k: 'd', label: 'Ø', name: 'Polygon size' }], offset: [{ k: 'd', label: 'D', name: 'Offset distance' }],
   move: [{ k: 'x', label: 'ΔX', name: 'Move X' }, { k: 'y', label: 'ΔY', name: 'Move Y' }], rect: [{ k: 'w', label: 'W', name: 'Width' }, { k: 'h', label: 'H', name: 'Height' }],
   circle: [{ k: 'd', label: 'Ø', name: 'Diameter' }], line: [{ k: 'l', label: 'L', name: 'Length' }],
+  slot: [{ k: 'l', label: 'L', name: 'Distance between the slot centers' }], sfillet: [{ k: 'r', label: 'R', name: 'Corner radius' }], schamfer: [{ k: 'd', label: 'D', name: 'Chamfer distance' }],
 };
-export const TOOL_NAMES: Record<string, string> = { align: 'Alignment', arc: 'Arc', trim: 'Trim', tangent: 'Tangent', midpt: 'Midpoint', ponl: 'Point on curve', ponc: 'Point on curve', polygon: 'Polygon', offset: 'Offset', move: 'Move', rect: 'Rectangle', circle: 'Circle', line: 'Line', dim: 'Dimension', hv: 'Horizontal/Vertical', perp: 'Perpendicular', par: 'Parallel', equal: 'Equal', fix: 'Fix', coincident: 'Coincident' };
+const SLOT_WIDTH: HudField[] = [{ k: 'w', label: 'W', name: 'Slot width' }];
+export const TOOL_NAMES: Record<string, string> = { slot: 'Slot', sfillet: 'Corner fillet', schamfer: 'Corner chamfer', smirror: 'Mirror', sproject: 'Project edges', align: 'Alignment', arc: 'Arc', trim: 'Trim', tangent: 'Tangent', midpt: 'Midpoint', ponl: 'Point on curve', ponc: 'Point on curve', polygon: 'Polygon', offset: 'Offset', move: 'Move', rect: 'Rectangle', circle: 'Circle', line: 'Line', dim: 'Dimension', hv: 'Horizontal/Vertical', perp: 'Perpendicular', par: 'Parallel', equal: 'Equal', fix: 'Fix', coincident: 'Coincident' };
 
 const toolPreview = new THREE.Group();
 scene.add(toolPreview);
@@ -60,6 +64,13 @@ export function setTool(type: string): void {
     T.phase = 'select';
     if (T.sel.length) advanceSelect(true);
   }
+  if (type === 'smirror') {
+    T.sel = pre.filter((p) => p.kind === 'curve');
+    T.phase = 'select';
+    if (T.sel.length) advanceSelect(true);
+  }
+  if (type === 'sfillet' || type === 'schamfer') { showHud(); focusHud(); }
+  if (type === 'sproject') T.list = projectables(state.sketch.frame!, baseBodies());
   if (type === 'polygon') startPolygonSides(T);
   refreshSketchStyles(state.sketch);
   rebuildOverlay();
@@ -91,10 +102,11 @@ export function advanceSelect(quiet?: boolean): void {
   if (!T) return;
   if (!T.sel.length) { message('Pick something first', 'warn'); return; }
   if (T.type === 'offset') { T.phase = 'place'; T.cur = state.skRaw || null; showHud(); focusHud(); updateToolPreview(); }
+  else if (T.type === 'smirror') T.phase = 'axis';
   else T.phase = 'base';
   if (state.sketch) refreshSketchStyles(state.sketch);
   updatePrompt();
-  if (!quiet) message(T.type === 'offset' ? `${T.sel.length} curve${T.sel.length > 1 ? 's' : ''} picked. Move to a side and type a distance.` : 'Specify base point');
+  if (!quiet) message(T.type === 'offset' ? `${T.sel.length} curve${T.sel.length > 1 ? 's' : ''} picked. Move to a side and type a distance.` : T.type === 'smirror' ? 'Now click the line to mirror across' : 'Specify base point');
 }
 export function hudEnter(): void {
   const T = state.tool;
@@ -102,6 +114,7 @@ export function hudEnter(): void {
   if (T.type === 'polygon' && T.phase === 'sides') { acceptSides(); return; }
   if (T.type === 'offset') { if (T.phase === 'place') commitOffset(); return; }
   if (T.type === 'move') { if (T.phase === 'dest') commitMove(); return; }
+  if (T.type === 'sfillet' || T.type === 'schamfer') { message(T.type === 'sfillet' ? 'Now click a corner to round' : 'Now click a corner to bevel'); return; }
   commitShape();
 }
 export function exitTool(_quiet?: boolean): void {
@@ -118,7 +131,7 @@ export function cancelShape(_quiet?: boolean): void {
   const T = state.tool;
   if (!T) return;
   T.pts = []; T.start = null; T.picks = []; T.inf = null; T.base = null;
-  if (T.type === 'offset' || T.type === 'move') { T.sel = []; T.phase = 'select'; }
+  if (T.type === 'offset' || T.type === 'move' || T.type === 'smirror') { T.sel = []; T.phase = 'select'; }
   else T.phase = null;
   closeToolUi();
   if (!state.pick) { pickTip.style.display = 'none'; pickTip.classList.remove('bad'); }
@@ -169,6 +182,10 @@ export function typeIntoHud(key: string): void {
   inp.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
+/** The point a typed distance away from `a`, toward `toward`. */
+const toolShapeEnd = (a: P2, toward: P2, dist: number): P2 => { const u = unitVec(a, toward); return [a[0] + u[0] * dist, a[1] + u[1] * dist]; };
+const unitVec = (a: P2, b: P2): P2 => { const l = d2(a, b) || 1; return [(b[0] - a[0]) / l, (b[1] - a[1]) / l]; };
+
 // ---- the shape being drawn ----
 function toolShape(): any {
   const T = state.tool!, a: P2 = T.pts[0].p, c: P2 = (T.cur || T.pts[0]).p;
@@ -203,6 +220,16 @@ function toolShape(): any {
     const n = Math.max(8, Math.ceil(sw / (Math.PI / 36)));
     for (let i = 0; i <= n; i++) { const t = a1 + (sw * i) / n; pts.push([q[0] + r * Math.cos(t), q[1] + r * Math.sin(t)]); }
     return { type: 'arc', q, r, swap, pts, a: s, b: e };
+  }
+  if (T.type === 'slot') {
+    if (T.pts.length < 2) {
+      let b = c.slice() as P2;
+      const L = hudVal('l');
+      if (L !== null) { const dx = c[0] - a[0], dy = c[1] - a[1], ln = Math.hypot(dx, dy); b = ln > 1e-9 ? [a[0] + (dx / ln) * L, a[1] + (dy / ln) * L] : [a[0] + L, a[1]]; }
+      return { type: 'slotline', a: a.slice(), b, l: d2(a, b) };
+    }
+    const e: P2 = T.pts[1].p, ax = unitVec(a, e), W = hudVal('w'), w = W !== null ? W : 2 * Math.abs((c[0] - a[0]) * ax[1] - (c[1] - a[1]) * ax[0]);
+    return { type: 'slot', a: a.slice(), b: e.slice(), w, l: d2(a, e), pts: slotOutline(a, e, Math.max(w, 1e-6)) };
   }
   if (T.type === 'polygon') {
     const n = T.sides || state.polySides, flats = state.polyMode === 'flats', cosA = Math.cos(Math.PI / n);
@@ -270,7 +297,8 @@ function updateToolPreview(): void {
   }
   if (!DRAW_TOOLS.has(T.type) || !T.pts.length) return;
   const s = toolShape();
-  if (s.type === 'line' || s.type === 'arcline' || (s.type === 'arc' && s.bad)) previewLines([s.a, s.b], false);
+  if (s.type === 'line' || s.type === 'slotline' || s.type === 'arcline' || (s.type === 'arc' && s.bad)) previewLines([s.a, s.b], false);
+  else if (s.type === 'slot') previewLines(s.pts, true);
   else if (s.type === 'arc') previewLines(s.pts, false);
   else if (s.type === 'rect') previewLines([[s.a[0], s.a[1]], [s.b[0], s.a[1]], [s.b[0], s.b[1]], [s.a[0], s.b[1]]], true);
   else if (s.type === 'polygon') previewLines(s.pts, true);
@@ -366,6 +394,11 @@ export function commitShape(): void {
     sk.curves.push({ id, type: 'arc', c: Q, p1: s.swap ? E : S, p2: s.swap ? S : E, r: s.r });
     if (typed('r')) addCon(sk, { type: 'radius', c: id, v: s.r }, true);
     label = `Arc R${fmtU(s.r)}`;
+  } else if (s.type === 'slot' || s.type === 'slotline') {
+    if (s.type === 'slotline') return;
+    const err = addSlot(sk, T.pts[0].id, s.a, T.pts[1].id, s.b, s.w);
+    if (err) { message(err, 'warn'); return; }
+    label = `Slot ${fmtU(s.l)} long, ${fmtU(s.w)} wide`;
   } else if (s.type === 'polygon') {
     if (s.R < 0.01) { message('Give the polygon a size', 'warn'); return; }
     // built on a construction circle: every corner rides on it and all sides are equal
@@ -566,6 +599,8 @@ function validHit(h: SkSel | null): SkSel | null {
     case 'dim': return T.picks.length ? (canExtend(T.picks, h) ? h : null) : h;
     case 'offset': return h.kind === 'curve' ? h : null;
     case 'move': return h.kind === 'point' && h.id === 'O' ? null : h;
+    case 'sfillet': case 'schamfer': return h.kind === 'point' ? h : null;
+    case 'smirror': return h.kind === 'curve' && (T.phase !== 'axis' || (isLine && !T.sel.some((x) => x.id === h.id))) ? h : null;
   }
   return null;
 }
@@ -597,6 +632,14 @@ export function sketchMove(e: PointerEvent | MouseEvent): void {
     }
     return;
   }
+  if (T && T.type === 'sproject') {
+    hoverWith(null, 'crosshair');
+    clearToolPreview();
+    T.target = nearestProjected((T.list || []) as Projected[], raw, worldPerPixel(w) * 10 * pickScale());
+    if (T.target) { const obj = new THREE.Line(new THREE.BufferGeometry().setFromPoints(projectedPts(T.target).map((p) => tw(sk.frame!, p[0], p[1], 0.12))), toolMat); obj.renderOrder = 15; toolPreview.add(obj); canvas.style.cursor = 'pointer'; }
+    return;
+  }
+  if (T && (T.type === 'sfillet' || T.type === 'schamfer')) { hoverWith(validHit(hitSketch(sk, raw, w)), ''); positionHud(); return; }
   if (T && T.type === 'offset') {
     if (T.phase === 'select') { hoverWith(validHit(hitSketch(sk, raw, w)), ''); return; }
     hoverWith(null, 'crosshair');
@@ -663,6 +706,16 @@ export function sketchClick(e: PointerEvent): void {
   const T = state.tool, sk = SK();
   if (T && (T.type === 'offset' || T.type === 'move')) { modifyClick(e); return; }
   if (T && T.type === 'trim') { if (T.target) applyTrim(T.target); else message('Click the part of a curve you want to remove'); return; }
+  if (T && (T.type === 'sfillet' || T.type === 'schamfer')) { cornerClick(T.type === 'sfillet' ? 'fillet' : 'chamfer'); return; }
+  if (T && T.type === 'smirror') { mirrorClick(e); return; }
+  if (T && T.type === 'sproject') {
+    if (!T.target) { message('Hover an edge of the body (it turns orange), then click it'); return; }
+    const snap = snapshot(sk), err = addProjected(sk, T.target);
+    if (err) { message(err, 'warn'); return; }
+    pushHist(sk, snap); skChanged(sk); T.target = null; clearToolPreview();
+    message('Edge projected into the sketch. Click more edges, or Esc when done.', 'ok');
+    return;
+  }
   if (T && DRAW_TOOLS.has(T.type)) {
     if (T.type === 'polygon' && T.phase === 'sides' && !acceptSides()) return;
     setTimeout(clearTracking, 0);
@@ -672,10 +725,13 @@ export function sketchClick(e: PointerEvent): void {
       if (T.type === 'line') T.start = { id: T.cur.id };
       if (T.type !== 'arc') { showHud(); focusHud(); }
       updateToolPreview(); updatePrompt();
-    } else if (T.type === 'arc' && T.pts.length === 1) {
+    } else if ((T.type === 'arc' || T.type === 'slot') && T.pts.length === 1) {
       if (!T.cur || d2(T.cur.p, T.pts[0].p) < 1e-6) return;
+      const typedL = T.type === 'slot' ? hudVal('l') : null;
       T.pts.push({ p: T.cur.p.slice(), id: T.cur.id, snap: T.cur.snap });
-      showHud(); focusHud(); updateToolPreview(); updatePrompt();
+      if (T.type === 'slot') { if (typedL !== null) { const a: P2 = T.pts[0].p, e = toolShapeEnd(a, T.cur.p, typedL); T.pts[1] = { p: e, id: null, snap: null }; } showHud(SLOT_WIDTH); }
+      else showHud();
+      focusHud(); updateToolPreview(); updatePrompt();
     } else commitShape();
     return;
   }
@@ -689,6 +745,43 @@ export function sketchClick(e: PointerEvent): void {
   const n = state.skSels.length;
   if (n > 1) message(`${n} items selected. Delete removes them, of offsets them, m moves them. Shift+click adds or removes.`);
   else if (n === 1) message(describeSel(sk, state.skSel!) + ' selected. Shift+click to add more. Delete removes it; drag to move.');
+}
+
+/** Corner fillet / chamfer: the size is the number in the box next to the cursor; each click on a corner applies it. */
+function cornerClick(kind: 'fillet' | 'chamfer'): void {
+  const sk = SK(), h = state.skHover;
+  if (!h || h.kind !== 'point') { message('Click a corner where two straight lines meet'); return; }
+  const v = hudVal(kind === 'fillet' ? 'r' : 'd');
+  if (v === null) { message(kind === 'fillet' ? 'Type a radius first, then click the corner' : 'Type a distance first, then click the corner', 'warn'); focusHud(); return; }
+  const snap = snapshot(sk), err = cornerEdit(sk, h.id, kind, v);
+  if (err) { restore(sk, snap); message(err, 'warn'); return; }
+  pushHist(sk, snap);
+  state.skHover = null;
+  solveSketch(sk); skChanged(sk);
+  message(`${kind === 'fillet' ? 'Rounded' : 'Beveled'} the corner (${fmtU(v)}). Click more corners, or Esc when done.`, 'ok');
+}
+
+/** Mirror: pick curves (a click takes a whole connected shape), Enter, then click the line to mirror across. */
+function mirrorClick(e: PointerEvent): void {
+  const T = state.tool!, sk = SK(), h = state.skHover;
+  if (T.phase === 'select') {
+    if (!h) { if (T.sel.length) message('Press Enter to continue with what you picked, or click more.'); return; }
+    const items = chainOf(sk, h.id, true), has = (it: SkSel): boolean => T.sel.some((x) => x.kind === it.kind && x.id === it.id);
+    if (items.every(has)) T.sel = T.sel.filter((x) => !items.some((it) => it.kind === x.kind && it.id === x.id));
+    else items.forEach((it) => { if (!has(it)) T.sel.push(it); });
+    refreshSketchStyles(sk); updatePrompt();
+    message(`${T.sel.length} picked. Click more, then press Enter.`);
+    return;
+  }
+  if (!h) { message('Click the straight line to mirror across', 'warn'); return; }
+  void e;
+  const snap = snapshot(sk), r = mirrorCurves(sk, T.sel.filter((x) => x.kind === 'curve').map((x) => x.id), h.id);
+  if (typeof r === 'string') { restore(sk, snap); message(r, 'warn'); return; }
+  pushHist(sk, snap);
+  T.sel = []; T.phase = 'select';
+  state.skHover = null;
+  refreshSketchStyles(sk); skChanged(sk); updatePrompt();
+  message(`Mirrored ${r} curve${r > 1 ? 's' : ''}. Pick more to mirror, or Esc to finish.`, 'ok');
 }
 
 function modifyClick(e: PointerEvent): void {
@@ -1154,6 +1247,11 @@ export function toolPrompt(): string {
     case 'polygon': return T.phase === 'sides' ? 'Polygon: type the number of sides, then press Enter' : T.pts.length ? 'Type a size or click to set it. The HUD button switches corners/flats; Shift turns off 15° rotation snap' : `Polygon (${T.sides} sides): click the center point`;
     case 'offset': return T.phase === 'select' ? 'Offset: click a curve or shape. Shift+click picks several, Enter continues' : 'Move to the side to offset toward, type a distance, then click or press Enter';
     case 'move': return T.phase === 'select' ? 'Move: select objects. Shift+click for several, Enter continues' : T.phase === 'base' ? 'Specify base point on the selected objects (snaps to endpoints, midpoints, centers)' : 'Specify second point, or type ΔX / ΔY and press Enter';
+    case 'slot': return !T.pts.length ? 'Slot: click the center of one end' : T.pts.length === 1 ? 'Click the center of the other end, or type the distance between the centers' : 'Move to set the width and click, or type a width and press Enter';
+    case 'sfillet': return 'Corner fillet: type a radius, then click corners where two lines meet (Esc when done)';
+    case 'schamfer': return 'Corner chamfer: type a distance, then click corners where two lines meet (Esc when done)';
+    case 'smirror': return T.phase === 'select' ? 'Mirror: click the shapes or curves to copy. Shift not needed; Enter continues' : 'Click the straight line to mirror across';
+    case 'sproject': return 'Project edges: hover an edge of the body and click it to copy it into the sketch (Esc when done)';
     case 'rect': return T.pts.length ? 'Type width, Tab, height, then Enter, or click the opposite corner' : 'Rectangle: click the first corner';
     case 'circle': return T.pts.length ? 'Type a diameter and press Enter, or click to set the size' : 'Circle: click the center';
     case 'line': return T.pts.length ? 'Type a length or click the next point. Click the start point to close, Esc to stop' : 'Line: click the start point';

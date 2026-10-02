@@ -31,6 +31,8 @@ const ICONS: Record<string, string> = {
   pattern:'<rect class="af" x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/>',
   mirror:'<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9 7L4 17h5z"/><path class="af" d="M15 7l5 10h-5z"/>',
   plane:'<path class="af" d="M2 17l5-9h15l-5 9z"/>',
+  slot:'<rect class="af" x="3" y="8" width="18" height="8" rx="4"/>',
+  sproject:'<path d="M4 20h16"/><path class="a" d="M7 4v13M7 17l-3-3M7 17l3-3"/><rect class="af" x="12" y="6" width="8" height="8" rx="1"/>',
   combine:'<rect x="3" y="7" width="12" height="12" rx="1"/><rect class="af" x="9" y="3" width="12" height="12" rx="1"/>',
   xform:'<rect class="af" x="4" y="9" width="10" height="10" rx="1"/><path class="a" d="M16 5h4v4M20 5l-6 6"/>',
   split:'<path d="M5 4h14v7H5zM5 13h14v7H5z"/><path class="a" d="M2 12h20" stroke-dasharray="3 2"/>',

@@ -1,4 +1,4 @@
-﻿// Operations on whole bodies: split a body with a plane (and key the two halves together), offset a body
+// Operations on whole bodies: split a body with a plane (and key the two halves together), offset a body
 // (grow it or shrink it, for fits and clearances). Kernel code: runs in the worker and in Node tests.
 import { basicFaceExtrusion, cast, getOC, isShape3D, makeCylinder, makePolygon, measureVolume, Vector, type Face, type Shape3D } from 'replicad';
 import { vadd, vcross, vdot, vlen, vnorm, vsc, vsub } from '../model/frames';

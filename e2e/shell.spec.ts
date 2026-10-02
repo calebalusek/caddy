@@ -20,7 +20,7 @@ const dialogBox = async (page: Page) => { await page.waitForTimeout(220); return
 test.describe('app shell', () => {
   test('loads cleanly: toolbar groups, panels, kernel ready, no errors', async ({ page }) => {
     const errors = await openApp(page);
-    await expect(page.locator('.tgroup-label span')).toHaveText(['Create', 'Modify', 'Construct', 'Look', 'Print']);
+    await expect(page.locator('.tgroup-label span')).toHaveText(['Create', 'Modify', 'Bodies', 'Construct', 'Look', 'Print']);
     await expect(page.locator('.browser summary .nm')).toHaveText(['Origin', 'Sketches', 'Construction', 'Bodies']);
     await expect(page.locator('#prompt')).toHaveText('Command');
     await expect(page.locator('#viewCube canvas')).toBeVisible();

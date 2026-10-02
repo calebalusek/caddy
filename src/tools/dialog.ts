@@ -74,6 +74,8 @@ export interface ToolDef<P = any> {
   dragStart?: (A: ActiveDialog<P>, e: PointerEvent) => any;
   dragMove?: (A: ActiveDialog<P>, data: any, e: PointerEvent) => void;
   dragEnd?: (A: ActiveDialog<P>, data: any) => void;
+  /** A choice was changed: the tool may fill in other values (the Hole presets). */
+  onChange?: (A: ActiveDialog<P>, key: string) => void;
   /** The bodies were rebuilt while the menu is open. */
   onBuilt?: (A: ActiveDialog<P>) => void;
   /** The menu is closing: remove the tool's highlights. */
@@ -411,6 +413,7 @@ export function initDialogs(): void {
     if (t.type !== 'radio' || !A) return;
     A.params[t.dataset.key!] = t.value;
     if (t.dataset.key === 'operation') A.params.opAuto = false;
+    if (A.def.onChange) { A.def.onChange(A, t.dataset.key!); syncFields(); }
     applyShowIf(); updateChips(); updatePreview();
     placePanel(dialogEl); // fields appeared or went away: keep the whole menu on screen
   });
