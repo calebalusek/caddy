@@ -37,6 +37,8 @@ const ICONS: Record<string, string> = {
   xform:'<rect class="af" x="4" y="9" width="10" height="10" rx="1"/><path class="a" d="M16 5h4v4M20 5l-6 6"/>',
   split:'<path d="M5 4h14v7H5zM5 13h14v7H5z"/><path class="a" d="M2 12h20" stroke-dasharray="3 2"/>',
   offsetbody:'<rect class="af" x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 2"/>',
+  thickness:'<rect x="4" y="7" width="16" height="10" rx="1"/><path class="a" d="M8 7v10M16 7v10"/>',
+  measure:'<path d="M3 17L17 3l4 4L7 21z"/><path class="a" d="M7 13l2 2M10 10l2 2M13 7l2 2"/>',
   overhang:'<path d="M4 20h7V10h9"/><path class="a" d="M13 13l3 3M16.5 13l3 3"/>',
   export:'<path class="a" d="M12 4v11M8 11l4 4 4-4"/><path d="M4 17v3h16v-3"/>',
   finish:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',

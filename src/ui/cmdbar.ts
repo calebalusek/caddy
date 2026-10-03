@@ -106,14 +106,14 @@ const SOLID_GROUPS: Group[] = [
   ['Bodies', 'modify', ['transform', 'combine', 'split', 'offsetbody']],
   ['Construct', 'construct', ['plane']],
   ['Look', 'print', ['appearance', 'renderview']],
-  ['Print', 'print', ['overhang', 'stl', '3mf', 'step']],
+  ['Print', 'print', ['measure', 'overhang', 'thickness', 'stl', '3mf', 'step']],
 ];
 const SKETCH_GROUPS: Group[] = [
   ['Create', 'sketch', ['line', 'rectangle', 'circle', 'arc', 'polygon', 'slot', 'stext', 'sproject']],
   ['Modify', 'modify', ['move', 'soffset', 'trim', 'sfillet', 'schamfer', 'smirror']],
   ['Constraints', 'construct', ['dimension', 'coincident', 'midpt', 'tangent', 'hv', 'perp', 'par', 'equal', 'fix']],
 ];
-const SHORT: Record<string, string> = { stext: 'Text', renderview: 'Render', appearance: 'Materials', midpt: 'Midpoint', sketch: 'Sketch', patrect: 'Pattern', transform: 'Move/Turn', sproject: 'Project', sfillet: 'Fillet', schamfer: 'Chamfer', smirror: 'Mirror', offsetbody: 'Offset body', split: 'Split', overhang: 'Overhangs', stl: 'STL', '3mf': '3MF', step: 'STEP', soffset: 'Offset', plane: 'Offset plane', hv: 'Horiz/Vert', perp: 'Perpendicular' };
+const SHORT: Record<string, string> = { stext: 'Text', renderview: 'Render', appearance: 'Materials', midpt: 'Midpoint', sketch: 'Sketch', patrect: 'Pattern', transform: 'Move/Turn', sproject: 'Project', sfillet: 'Fillet', schamfer: 'Chamfer', smirror: 'Mirror', offsetbody: 'Offset body', split: 'Split', overhang: 'Overhangs', thickness: 'Walls', stl: 'STL', '3mf': '3MF', step: 'STEP', soffset: 'Offset', plane: 'Offset plane', hv: 'Horiz/Vert', perp: 'Perpendicular' };
 
 export function renderToolbar(): void {
   const sk = state.mode === 'sketch';

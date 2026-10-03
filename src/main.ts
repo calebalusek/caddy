@@ -33,6 +33,8 @@ import './tools/transform';
 import './tools/split';
 import './tools/offsetbody';
 import './tools/overhang';
+import './tools/thickness';
+import './tools/measure';
 import './tools/text';
 import './tools/thread';
 import { initChrome } from './ui/chrome';

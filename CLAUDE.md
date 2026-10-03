@@ -77,6 +77,11 @@ parts for **3D printing**. Built for the owner and other people to use.
     and circles/arcs facing the sketch plane). Ellipse/Spline are deferred (they need new curve types).
     Later ideas: Loft, Draft angle, wall-thickness check, Measure + weight, Section view, Coil, fit-to-bed
     layout, snap-fit/hinge generators, lattice infill.
+  - **Wall thickness check + Measure done** (2026-10-03): `tools/thickness.ts` (`model/thickness.ts`: a ray goes
+    inward from sample spots on every triangle, bounding-box tree; flags faces under the limit; a view with
+    no History entry like Overhang) and `tools/measure.ts` (`model/measure.ts`: two points with snaps give
+    distance and ΔX/Y/Z, an edge gives its length, a face its area, plus weight by material and infill %).
+    Both are in the Print toolbar group (`WT`, `ME`).
   - Windows PowerShell 5.1 gotcha: `Get-Content`/`Set-Content` mangle UTF-8 (° × → Ø) and add a BOM. Edit
     source files with the Edit tool or node, never with PowerShell read/write.
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
