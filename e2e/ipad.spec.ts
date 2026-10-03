@@ -148,6 +148,60 @@ test.describe('fingers move the view', () => {
   });
 });
 
+test.describe('drawing with a finger', () => {
+  const start = async (page: Page): Promise<void> => {
+    await typeCommand(page, 'sk');
+    await page.locator('#tree [data-ref="origin:XY"]').click();
+    await settle(page);
+  };
+  const sk = (page: Page, x: number, y: number) => page.evaluate(([a, b]) => (window as any).__caddy.sketchScreen(a, b), [x, y]) as Promise<Pt>;
+
+  test('with the Rectangle tool, touch where it starts, slide, lift where it ends', async ({ page }) => {
+    const errors = await openApp(page);
+    await start(page);
+    await typeCommand(page, 'rec');
+    const h = await hand(page), a = await sk(page, 0, 0), b = await sk(page, 40, 25), before = await camState(page);
+    await h.drag([a], [b]);
+    const s = await page.evaluate(() => { const k = (window as any).__caddy.state.sketch; return { curves: k.curves.length, xs: Object.values(k.pts).map((p: any) => p.x), ys: Object.values(k.pts).map((p: any) => p.y) }; });
+    expect(s.curves).toBe(4);
+    expect(Math.max(...s.xs) - Math.min(...s.xs)).toBeCloseTo(40, 0);
+    expect(Math.max(...s.ys) - Math.min(...s.ys)).toBeCloseTo(25, 0);
+    const after = await camState(page);
+    expect(Math.abs(after.r - before.r) / before.r).toBeLessThan(0.02); // the view did not zoom or pan: the finger drew
+    expect(Math.hypot(after.tx - before.tx, after.ty - before.ty)).toBeLessThan(1e-6);
+    expect(errors).toEqual([]);
+  });
+
+  test('sliding to the edge of the screen zooms the view out so a big shape fits; lifting sets it there', async ({ page }) => {
+    const errors = await openApp(page);
+    await start(page);
+    await typeCommand(page, 'c');
+    const h = await hand(page), a = await sk(page, 0, 0), r = await page.evaluate(() => { const q = document.querySelector('#viewport canvas')!.getBoundingClientRect(); return { right: q.right, top: q.top, bottom: q.bottom }; });
+    const before = await camState(page), edge = { x: r.right - 10, y: a.y };
+    await h.down([a]);
+    for (let i = 1; i <= 8; i++) await h.move([{ x: a.x + ((edge.x - a.x) * i) / 8, y: a.y }]);
+    const farAtEdgeStart = (await page.evaluate(() => (window as any).__caddy.state.tool.cur.p[0])) as number;
+    await page.waitForTimeout(900); // holding the finger at the edge: the view keeps backing away
+    const mid = await camState(page);
+    expect(mid.r).toBeGreaterThan(before.r * 1.4);
+    await h.up();
+    const circle = await page.evaluate(() => (window as any).__caddy.state.sketch.curves.find((c: any) => c.type === 'circle'));
+    expect(circle).toBeTruthy();
+    expect(circle.r).toBeGreaterThan(farAtEdgeStart * 1.3); // bigger than what fitted on screen when the finger arrived
+    expect(errors).toEqual([]);
+  });
+
+  test('two fingers still pan and zoom while a drawing tool is on', async ({ page }) => {
+    const errors = await openApp(page);
+    await start(page);
+    await typeCommand(page, 'rec');
+    const h = await hand(page), c = await center(page), a = await camState(page);
+    await h.drag([{ x: c.x - 120, y: c.y }, { x: c.x + 120, y: c.y }], [{ x: c.x - 40, y: c.y }, { x: c.x + 40, y: c.y }]);
+    expect((await camState(page)).r).toBeGreaterThan(a.r * 1.8);
+    expect(errors).toEqual([]);
+  });
+});
+
 test.describe('the Apple Pencil', () => {
   test('in a sketch, drag with the pencil to draw: a rectangle from corner to corner, a circle from center to edge', async ({ page }) => {
     const errors = await openApp(page);

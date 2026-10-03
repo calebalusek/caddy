@@ -27,7 +27,9 @@ type Ptr =
 interface Multi { cx: number; cy: number; dist: number; ang: number; moved: boolean; t0: number; fingers: number; sx: number; sy: number; sdist: number }
 
 const LONG_PRESS_MS = 550, TAP_MS = 350, DOUBLE_TAP_MS = 380;
-const DRAWING_TOOLS = new Set(['line', 'rect', 'circle', 'arc', 'polygon']);
+const DRAWING_TOOLS = new Set(['line', 'rect', 'circle', 'arc', 'polygon', 'slot']);
+/** How close to the edge of the viewport (px) a sliding finger starts to zoom the view out. */
+const EDGE_ZONE = 90;
 
 /** Pan the camera by a screen movement. */
 function panBy(dx: number, dy: number): void {
@@ -57,6 +59,26 @@ export function initPointer(): void {
     const t = two();
     if (!t) return null;
     return { cx: (t.a.x + t.b.x) / 2, cy: (t.a.y + t.b.y) / 2, dist: Math.hypot(t.b.x - t.a.x, t.b.y - t.a.y) || 1, ang: Math.atan2(t.b.y - t.a.y, t.b.x - t.a.x) };
+  };
+
+  // While a shape is being drawn by sliding, the view backs away when the finger nears the edge of the viewport,
+  // so a shape bigger than the screen can still be sized and let go at the right spot.
+  let zoomRaf = 0;
+  const stopEdgeZoom = (): void => { cancelAnimationFrame(zoomRaf); zoomRaf = 0; };
+  const startEdgeZoom = (): void => {
+    stopEdgeZoom();
+    const tick = (): void => {
+      if (!ptr || ptr.mode !== 'pendraw' || !lastEvent) { zoomRaf = 0; return; }
+      const r = canvas.getBoundingClientRect(), x = lastEvent.clientX, y = lastEvent.clientY;
+      const near = Math.min(x - r.left, r.right - x, y - r.top, r.bottom - y), zone = EDGE_ZONE * (lastEvent.pointerType === 'touch' ? 1 : 0.6);
+      if (near < zone) {
+        const k = Math.min(1, Math.max(0, 1 - near / zone)); // 0 at the edge of the zone, 1 right at the screen edge
+        cam.r = clampR(cam.r * (1 + 0.02 * k));
+        hoverMove(lastEvent); // the point under the finger moves as the view does
+      }
+      zoomRaf = requestAnimationFrame(tick);
+    };
+    zoomRaf = requestAnimationFrame(tick);
   };
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -92,10 +114,10 @@ export function initPointer(): void {
       const sd = sketchDragStart(e);
       if (sd) { ptr = { mode: 'skdrag', drag: sd }; return; }
     }
-    // the pencil draws in a sketch: down where a shape starts, up where it ends
-    if (e.pointerType === 'pen' && state.mode === 'sketch' && !state.pick && state.tool && DRAWING_TOOLS.has(state.tool.type) && e.button === 0 && !(e.buttons & 2)) {
+    // the pencil and a finger draw in a sketch: down where a shape starts, slide, up where it ends
+    if ((e.pointerType === 'pen' || e.pointerType === 'touch') && state.mode === 'sketch' && !state.pick && state.tool && DRAWING_TOOLS.has(state.tool.type) && e.button === 0 && !(e.buttons & 2)) {
       const started = !(state.tool.pts && state.tool.pts.length);
-      hoverMove(e); // a pencil that was not hovering still snaps to what it came down on
+      hoverMove(e); // a pencil or finger that was not hovering still snaps to what it came down on
       if (started) sketchClick(e);
       ptr = { mode: 'pendraw', x: e.clientX, y: e.clientY, moved: false, started };
       return;
@@ -148,8 +170,13 @@ export function initPointer(): void {
     }
     if (ptr.mode === 'skdrag') { sketchDragMove(e, ptr.drag); return; }
     if (ptr.mode === 'pendraw') {
-      if (!ptr.moved && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) > 6) ptr.moved = true;
-      hoverMove(e); // the shape stretches to follow the pencil
+      if (!ptr.moved && Math.hypot(e.clientX - ptr.x, e.clientY - ptr.y) > 6) {
+        ptr.moved = true;
+        // sliding a finger: put the number pad away so it does not cover the shape
+        if (e.pointerType === 'touch' && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+        startEdgeZoom();
+      }
+      hoverMove(e); // the shape stretches to follow the pencil or finger
       return;
     }
     if (ptr.mode === 'tooldrag') {

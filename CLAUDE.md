@@ -82,6 +82,9 @@ parts for **3D printing**. Built for the owner and other people to use.
     no History entry like Overhang) and `tools/measure.ts` (`model/measure.ts`: two points with snaps give
     distance and ΔX/Y/Z, an edge gives its length, a face its area, plus weight by material and infill %).
     Both are in the Print toolbar group (`WT`, `ME`).
+  - **Finger drawing** (2026-10-03): with a drawing tool on (line, rectangle, circle, arc, polygon, slot) a finger
+    draws like the Pencil (down = start, slide, lift = end; `pendraw` in `view/pointer.ts`); two fingers still
+    pan/zoom. Sliding within ~90 px of the viewport edge zooms the view out (`startEdgeZoom`) so a big shape fits.
   - Windows PowerShell 5.1 gotcha: `Get-Content`/`Set-Content` mangle UTF-8 (° × → Ø) and add a BOM. Edit
     source files with the Edit tool or node, never with PowerShell read/write.
 - Tools not rebuilt yet say which step brings them back (`step` in `src/app/commands.ts`).
