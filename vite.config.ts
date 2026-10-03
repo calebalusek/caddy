@@ -25,6 +25,7 @@ const CACHE = 'caddy-${h.digest('hex').slice(0, 12)}';
 const FILES = ${JSON.stringify(['', ...list])};
 const root = self.registration.scope;
 self.addEventListener('install', (e) => {
+  self.skipWaiting(); // a new version takes over at once (the page reloads itself; projects are autosaved)
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new URL(f, root).href))));
 });
 self.addEventListener('activate', (e) => {

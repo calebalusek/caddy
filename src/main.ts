@@ -106,6 +106,14 @@ void initProjects();
 // Offline: once the files are saved on this device, CADDY opens with no internet. A new version waits
 // until CADDY is closed and reopened, so nothing changes under the user's feet while they work.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  // a new version took over: reload into it once (autosave keeps the project)
+  const had = !!navigator.serviceWorker.controller;
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!had || reloaded) return;
+    reloaded = true;
+    void flushSave().finally(() => location.reload());
+  });
   navigator.serviceWorker.register('./sw.js').then((reg) => {
     const tell = (): void => message('A new version of CADDY is ready. Close and reopen it to use it.');
     if (reg.waiting && navigator.serviceWorker.controller) tell();
